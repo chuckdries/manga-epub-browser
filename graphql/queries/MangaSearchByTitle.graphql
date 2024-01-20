@@ -1,0 +1,9 @@
+query MangaSearchByTitle($title: String!) {
+  mangas(filter: {title: {includesInsensitive: $title}}) {
+    nodes {
+      id
+      title
+      genre
+    }
+  }
+}
