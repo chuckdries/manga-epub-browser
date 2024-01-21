@@ -1,0 +1,14 @@
+<h1>{{ title }} search results</h1>
+
+<div>
+  {% for manga in mangas %}
+  <div>
+    <h2>{{ manga.title }}</h2>
+    <ul>
+      {% for genre in manga.genre %}
+      <li>{{ genre }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endfor %}
+</div>
