@@ -4,6 +4,8 @@ query MangaSearchByTitle($title: String!) {
       id
       title
       genre
+      description
+      thumbnailUrl
     }
   }
 }
