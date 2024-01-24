@@ -1,22 +1,22 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::{HashMap, HashSet}, sync::Arc};
 
 use anyhow::{anyhow, Error, Result};
 use askama::Template;
 use axum::{
     debug_handler,
-    extract::{Path, Query},
+    extract::{Form, Path, Query},
     http::StatusCode,
     response::{Html, IntoResponse, Response},
-    routing::get,
+    routing::{get, post},
     Extension, Router,
 };
+use config::{builder::DefaultState, ConfigBuilder, ConfigError, Environment, File};
 use graphql_client::{reqwest::post_graphql, GraphQLQuery};
 use manga_search_by_title::MangaSearchByTitleMangasNodes;
 use reqwest;
-
-use config::{builder::DefaultState, ConfigBuilder, ConfigError, Environment, File};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
+use tower_sessions::{cookie::time::Duration, Expiry, MemoryStore, Session, SessionManagerLayer};
 use util::join_url;
 
 mod util; // Declare the util module
@@ -191,7 +191,7 @@ async fn manga_by_id(
 #[graphql(
     schema_path = "graphql/schema.json",
     query_path = "graphql/queries/SpecificMangaChapters.graphql",
-    response_derives = "Debug"
+    response_derives = "Debug,Clone"
 )]
 pub struct SpecificMangaChapters;
 
@@ -225,24 +225,137 @@ async fn get_chapters_by_id(
 struct ChapterSelectTemplate {
     mangaId: i64,
     title: String,
-    chapters: Vec<specific_manga_chapters::SpecificMangaChaptersMangaChaptersNodes>,
-    limit: isize,
-    offset: isize,
+    items: Vec<specific_manga_chapters::SpecificMangaChaptersMangaChaptersNodes>,
+    selected: HashSet<i64>,
+    limit: usize,
+    offset: usize,
 }
 
 #[debug_handler]
-async fn chapters_by_manga_id(
+async fn get_chapters_by_manga_id(
     Extension(shared_state): Extension<Arc<AppState>>,
     params: Path<i64>,
 ) -> Result<ChapterSelectTemplate, AppError> {
     let api_base = &shared_state.config.read().await.suwayomi_url;
     let (title, chapters) = get_chapters_by_id(params.0, api_base).await?;
+    let limit = 20;
+    let offset = 0;
+    // CQ: TODO avoid this copy
+    let items = chapters[offset..limit].to_vec();
     Ok(ChapterSelectTemplate {
         mangaId: params.0,
         title,
-        chapters,
-        limit: 0,
-        offset: 20,
+        items,
+        limit,
+        offset,
+        selected: HashSet::new(),
+    })
+}
+
+#[derive(Deserialize)]
+struct ChapterSelectInput {
+    #[serde(
+        rename = "selected_items[]",
+        flatten,
+        deserialize_with = "util::deserialize_items"
+    )]
+    selected_items: Vec<String>,
+    page_control: Option<String>,
+}
+
+const SESSION_OFFSET_KEY: &str = "offset";
+#[derive(Default, Deserialize, Serialize)]
+struct SessionOffset(usize);
+const SESSION_SELECTED_CHAPTERS_KEY: &str = "selected_chapters";
+#[derive(Default, Deserialize, Serialize)]
+struct SessionSelectedChapters(HashMap<usize, Vec<i64>>);
+
+#[debug_handler]
+async fn post_chapters_by_manga_id(
+    Extension(shared_state): Extension<Arc<AppState>>,
+    params: Path<i64>,
+    session: Session,
+    Form(data): Form<ChapterSelectInput>,
+) -> Result<ChapterSelectTemplate, AppError> {
+    let api_base = &shared_state.config.read().await.suwayomi_url;
+
+    let limit = 20;
+    let mut offset: SessionOffset = session
+        .get(SESSION_OFFSET_KEY)
+        .await
+        .unwrap()
+        .unwrap_or_default();
+
+    let mut session_selected_chapters = session
+        .get::<SessionSelectedChapters>(SESSION_SELECTED_CHAPTERS_KEY)
+        .await
+        .unwrap()
+        .unwrap_or_default()
+        .0;
+
+    let mut previously_selected_chapters: HashSet<i64> = HashSet::new();
+    
+    match session_selected_chapters.get(&offset.0) {
+        // CQ: TODO avoid this copy
+        Some(v) => for &value in v {
+            previously_selected_chapters.insert(value);
+        },
+        None => {},
+    };
+
+    let new_chapters_selected = data
+        .selected_items
+        .iter()
+        .map(|s| {
+            s.parse::<i64>()
+                .expect("bad ID in form body selected_items")
+        })
+        .collect();
+    // previously_selected_chapters.contains(value)
+    session_selected_chapters.insert(offset.0, new_chapters_selected);
+    session
+        .insert(
+            SESSION_SELECTED_CHAPTERS_KEY,
+            SessionSelectedChapters(session_selected_chapters),
+        )
+        .await?;
+
+    match data.page_control {
+        Some(s) if s == "prev" => {
+            if offset.0 >= limit {
+                session
+                    .insert(SESSION_OFFSET_KEY, offset.0 - limit)
+                    .await
+                    .unwrap();
+            }
+        }
+        Some(s) if s == "next" => session
+            .insert(SESSION_OFFSET_KEY, offset.0 + limit)
+            .await
+            .unwrap(),
+        Some(_) => {}
+        None => {
+            // TODO submit selection and return
+        }
+    };
+    offset = session
+        .get(SESSION_OFFSET_KEY)
+        .await
+        .unwrap()
+        .unwrap_or_default();
+    let end = offset.0 + limit;
+
+    let (title, chapters) = get_chapters_by_id(params.0, api_base).await?;
+    // CQ: TODO avoid this copy
+    let items = chapters[offset.0..end].to_vec();
+
+    Ok(ChapterSelectTemplate {
+        mangaId: params.0,
+        title,
+        items,
+        limit,
+        offset: offset.0,
+        selected: previously_selected_chapters,
     })
 }
 
@@ -261,14 +374,22 @@ async fn main() {
     let state = Arc::new(AppState {
         config: RwLock::new(config),
     });
+
+    let session_store = MemoryStore::default();
+    let session_layer = SessionManagerLayer::new(session_store)
+        .with_secure(false)
+        .with_expiry(Expiry::OnInactivity(Duration::days(14)));
+
     // build our application with a single route
     let app = Router::new()
         .route("/", get(home))
         .route("/search", get(search_results))
         .route("/manga/:id", get(manga_by_id))
-        .route("/manga/:id/chapters", get(chapters_by_manga_id))
+        .route("/manga/:id/chapters", get(get_chapters_by_manga_id))
+        .route("/manga/:id/chapters", post(post_chapters_by_manga_id))
         .fallback(not_found)
-        .layer(Extension(state.clone()));
+        .layer(Extension(state.clone()))
+        .layer(session_layer);
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
     println!("listening on {}", listener.local_addr().unwrap());

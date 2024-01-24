@@ -9,7 +9,7 @@ edition = "2021"
 anyhow = "1.0.79"
 askama = { version = "0.12.1", features = ["with-axum"] }
 askama_axum = "0.4.0"
-axum = { version = "0.7.4", features = ["macros"] }
+axum = { version = "0.7.4", features = ["macros", "form"] }
 config = "0.13.4"
 graphql_client = { version = "0.13.0", features = ["reqwest"] }
 reqwest = "0.11.23"
