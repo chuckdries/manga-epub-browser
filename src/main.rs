@@ -1,4 +1,7 @@
-use std::{collections::{HashMap, HashSet}, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
 
 use anyhow::{anyhow, Error, Result};
 use askama::Template;
@@ -286,22 +289,14 @@ async fn post_chapters_by_manga_id(
         .unwrap()
         .unwrap_or_default();
 
+    let prev_page_offset = offset.0;
+
     let mut session_selected_chapters = session
         .get::<SessionSelectedChapters>(SESSION_SELECTED_CHAPTERS_KEY)
         .await
         .unwrap()
         .unwrap_or_default()
         .0;
-
-    let mut previously_selected_chapters: HashSet<i64> = HashSet::new();
-    
-    match session_selected_chapters.get(&offset.0) {
-        // CQ: TODO avoid this copy
-        Some(v) => for &value in v {
-            previously_selected_chapters.insert(value);
-        },
-        None => {},
-    };
 
     let new_chapters_selected = data
         .selected_items
@@ -311,8 +306,27 @@ async fn post_chapters_by_manga_id(
                 .expect("bad ID in form body selected_items")
         })
         .collect();
-    // previously_selected_chapters.contains(value)
-    session_selected_chapters.insert(offset.0, new_chapters_selected);
+
+    let new_current_page = match data.page_control {
+        Some(s) if s == "prev" && offset.0 >= limit => prev_page_offset - limit,
+        Some(s) if s == "next" => prev_page_offset + limit,
+        Some(_) => prev_page_offset,
+        None => prev_page_offset,
+    };
+
+    let mut previously_selected_chapters: HashSet<i64> = HashSet::new();
+
+    match session_selected_chapters.get(&new_current_page) {
+        // CQ: TODO avoid this copy
+        Some(v) => {
+            for &value in v {
+                previously_selected_chapters.insert(value);
+            }
+        }
+        None => {}
+    };
+
+    session_selected_chapters.insert(prev_page_offset, new_chapters_selected);
     session
         .insert(
             SESSION_SELECTED_CHAPTERS_KEY,
@@ -320,29 +334,17 @@ async fn post_chapters_by_manga_id(
         )
         .await?;
 
-    match data.page_control {
-        Some(s) if s == "prev" => {
-            if offset.0 >= limit {
-                session
-                    .insert(SESSION_OFFSET_KEY, offset.0 - limit)
-                    .await
-                    .unwrap();
-            }
-        }
-        Some(s) if s == "next" => session
-            .insert(SESSION_OFFSET_KEY, offset.0 + limit)
-            .await
-            .unwrap(),
-        Some(_) => {}
-        None => {
-            // TODO submit selection and return
-        }
-    };
+    session
+        .insert(SESSION_OFFSET_KEY, new_current_page)
+        .await
+        .unwrap();
+
     offset = session
         .get(SESSION_OFFSET_KEY)
         .await
         .unwrap()
         .unwrap_or_default();
+
     let end = offset.0 + limit;
 
     let (title, chapters) = get_chapters_by_id(params.0, api_base).await?;
@@ -354,7 +356,7 @@ async fn post_chapters_by_manga_id(
         title,
         items,
         limit,
-        offset: offset.0,
+        offset: new_current_page,
         selected: previously_selected_chapters,
     })
 }
