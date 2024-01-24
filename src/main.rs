@@ -235,7 +235,6 @@ struct ChapterSelectTemplate {
     offset: usize,
 }
 
-
 #[debug_handler]
 async fn get_chapters_by_manga_id(
     Extension(shared_state): Extension<Arc<AppState>>,
@@ -271,13 +270,45 @@ const SESSION_SELECTED_CHAPTERS_KEY: &str = "selected_chapters";
 #[derive(Default, Deserialize, Serialize)]
 struct SessionSelectedChapters(HashMap<usize, HashSet<i64>>);
 
+// Define an enum to hold either a Template or a String
+enum PostChapterResponse {
+    TemplateResponse(ChapterSelectTemplate),
+    StringResponse(String),
+}
+
+// Implement IntoResponse for MyResponse
+impl IntoResponse for PostChapterResponse {
+    fn into_response(self) -> Response {
+        match self {
+            PostChapterResponse::TemplateResponse(template) => template.into_response(),
+            PostChapterResponse::StringResponse(text) => text.into_response(),
+        }
+    }
+}
+
+fn concat_chapter_ids(
+    session_selected: HashMap<usize, HashSet<i64>>,
+    current_selection: HashSet<i64>,
+    current_page: usize,
+) -> HashSet<i64> {
+    let mut all_selected: HashSet<i64> = HashSet::new();
+    for page in session_selected.keys() {
+        if *page != current_page {
+            let page_selected = session_selected.get(page).unwrap();
+            all_selected.extend(page_selected)
+        }
+    }
+    all_selected.extend(current_selection);
+    all_selected
+}
+
 #[debug_handler]
 async fn post_chapters_by_manga_id(
     Extension(shared_state): Extension<Arc<AppState>>,
     params: Path<i64>,
     session: Session,
     Form(data): Form<ChapterSelectInput>,
-) -> Result<ChapterSelectTemplate, AppError> {
+) -> Result<PostChapterResponse, AppError> {
     let api_base = &shared_state.config.read().await.suwayomi_url;
 
     let limit = 20;
@@ -309,7 +340,17 @@ async fn post_chapters_by_manga_id(
         Some(s) if s == "prev" && offset.0 >= limit => prev_page_offset - limit,
         Some(s) if s == "next" => prev_page_offset + limit,
         Some(_) => prev_page_offset,
-        None => prev_page_offset,
+        None => {
+            let all_chapters = concat_chapter_ids(
+                session_selected_chapters,
+                new_chapters_selected,
+                prev_page_offset,
+            );
+            return Ok(PostChapterResponse::StringResponse(format!(
+                "{:#?}",
+                all_chapters
+            )));
+        }
     };
 
     let previously_selected_chapters = match session_selected_chapters.get(&new_current_page) {
@@ -334,14 +375,16 @@ async fn post_chapters_by_manga_id(
     // CQ: TODO avoid this copy
     let items = chapters[new_current_page..end].to_vec();
 
-    Ok(ChapterSelectTemplate {
-        manga_id: params.0,
-        title,
-        items,
-        limit,
-        offset: new_current_page,
-        selected: previously_selected_chapters,
-    })
+    Ok(PostChapterResponse::TemplateResponse(
+        ChapterSelectTemplate {
+            manga_id: params.0,
+            title,
+            items,
+            limit,
+            offset: new_current_page,
+            selected: previously_selected_chapters,
+        },
+    ))
 }
 
 #[derive(Template)]
