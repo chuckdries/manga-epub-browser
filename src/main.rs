@@ -268,8 +268,7 @@ const SESSION_OFFSET_KEY: &str = "offset";
 struct SessionOffset(usize);
 const SESSION_SELECTED_CHAPTERS_KEY: &str = "selected_chapters";
 #[derive(Default, Deserialize, Serialize)]
-// CQ: TODO this should be a hashset, not a vec
-struct SessionSelectedChapters(HashMap<usize, Vec<i64>>);
+struct SessionSelectedChapters(HashMap<usize, HashSet<i64>>);
 
 #[debug_handler]
 async fn post_chapters_by_manga_id(
@@ -312,16 +311,10 @@ async fn post_chapters_by_manga_id(
         None => prev_page_offset,
     };
 
-    let mut previously_selected_chapters: HashSet<i64> = HashSet::new();
-
-    match session_selected_chapters.get(&new_current_page) {
+    let previously_selected_chapters = match session_selected_chapters.get(&new_current_page) {
         // CQ: TODO avoid this copy
-        Some(v) => {
-            for &value in v {
-                previously_selected_chapters.insert(value);
-            }
-        }
-        None => {}
+        Some(s) => s.clone(),
+        None => HashSet::new(),
     };
 
     session_selected_chapters.insert(prev_page_offset, new_chapters_selected);

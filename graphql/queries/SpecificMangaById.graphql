@@ -1,5 +1,6 @@
 query SpecificMangaById($id: Int!) {
   manga(id: $id) {
+    id,
     author,
     title,
     genre

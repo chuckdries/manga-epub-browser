@@ -1,14 +1,22 @@
 <h1>Select chapters from {{ title }}</h1>
 {{offset}}
 
-<form class="chapter-select-form" action="/manga/{{ mangaId }}/chapters" method="post">
+<form
+  class="chapter-select-form"
+  action="/manga/{{ mangaId }}/chapters"
+  method="post"
+>
   <!-- Item Selection Checkboxes -->
   <ul>
     {% for item in items %}
     <li>
       <label>
-        ({{selected.contains(item.id)}})
-        <input type="checkbox" name="selected_items" value="{{item.id}}" {% if selected.contains(item.id) %} checked {% endif %}/>
+        <input
+          type="checkbox"
+          name="selected_items"
+          value="{{item.id}}"
+          {% if selected.contains(item.id) %} checked {% endif %}
+        />
         {{item.name}}
       </label>
     </li>
