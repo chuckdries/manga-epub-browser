@@ -106,10 +106,7 @@ async fn search_manga_by_title(
     .await?
     .data
     {
-        Some(data) => {
-            println!("{:#?}", data.mangas.nodes);
-            Ok(data.mangas.nodes)
-        }
+        Some(data) => Ok(data.mangas.nodes),
         None => Err(anyhow!("Missing response data")),
     };
 }
@@ -198,6 +195,57 @@ async fn manga_by_id(
 )]
 pub struct SpecificMangaChapters;
 
+async fn get_chapters_by_id(
+    id: i64,
+    base_url: &str,
+) -> Result<
+    (
+        String,
+        Vec<specific_manga_chapters::SpecificMangaChaptersMangaChaptersNodes>,
+    ),
+    Error,
+> {
+    let client = reqwest::Client::new();
+
+    return match post_graphql::<SpecificMangaChapters, _>(
+        &client,
+        join_url(base_url, "/api/graphql")?,
+        specific_manga_chapters::Variables { id },
+    )
+    .await?
+    .data
+    {
+        Some(data) => Ok((data.manga.title, data.manga.chapters.nodes)),
+        None => Err(anyhow!("Missing response data")),
+    };
+}
+
+#[derive(Template)]
+#[template(path = "chapter-select.html")]
+struct ChapterSelectTemplate {
+    mangaId: i64,
+    title: String,
+    chapters: Vec<specific_manga_chapters::SpecificMangaChaptersMangaChaptersNodes>,
+    limit: isize,
+    offset: isize,
+}
+
+#[debug_handler]
+async fn chapters_by_manga_id(
+    Extension(shared_state): Extension<Arc<AppState>>,
+    params: Path<i64>,
+) -> Result<ChapterSelectTemplate, AppError> {
+    let api_base = &shared_state.config.read().await.suwayomi_url;
+    let (title, chapters) = get_chapters_by_id(params.0, api_base).await?;
+    Ok(ChapterSelectTemplate {
+        mangaId: params.0,
+        title,
+        chapters,
+        limit: 0,
+        offset: 20,
+    })
+}
+
 #[derive(Template)]
 #[template(path = "home.html")]
 struct HomeTemplate {}
@@ -218,6 +266,7 @@ async fn main() {
         .route("/", get(home))
         .route("/search", get(search_results))
         .route("/manga/:id", get(manga_by_id))
+        .route("/manga/:id/chapters", get(chapters_by_manga_id))
         .fallback(not_found)
         .layer(Extension(state.clone()));
 
