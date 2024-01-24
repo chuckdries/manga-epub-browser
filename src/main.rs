@@ -268,6 +268,7 @@ const SESSION_OFFSET_KEY: &str = "offset";
 struct SessionOffset(usize);
 const SESSION_SELECTED_CHAPTERS_KEY: &str = "selected_chapters";
 #[derive(Default, Deserialize, Serialize)]
+// CQ: TODO this should be a hashset, not a vec
 struct SessionSelectedChapters(HashMap<usize, Vec<i64>>);
 
 #[debug_handler]
