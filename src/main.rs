@@ -227,13 +227,14 @@ async fn get_chapters_by_id(
 #[derive(Template)]
 #[template(path = "chapter-select.html")]
 struct ChapterSelectTemplate {
-    mangaId: i64,
+    manga_id: i64,
     title: String,
     items: Vec<specific_manga_chapters::SpecificMangaChaptersMangaChaptersNodes>,
     selected: HashSet<i64>,
     limit: usize,
     offset: usize,
 }
+
 
 #[debug_handler]
 async fn get_chapters_by_manga_id(
@@ -247,7 +248,7 @@ async fn get_chapters_by_manga_id(
     // CQ: TODO avoid this copy
     let items = chapters[offset..limit].to_vec();
     Ok(ChapterSelectTemplate {
-        mangaId: params.0,
+        manga_id: params.0,
         title,
         items,
         limit,
@@ -334,7 +335,7 @@ async fn post_chapters_by_manga_id(
     let items = chapters[new_current_page..end].to_vec();
 
     Ok(ChapterSelectTemplate {
-        mangaId: params.0,
+        manga_id: params.0,
         title,
         items,
         limit,
