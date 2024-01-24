@@ -1,0 +1,12 @@
+query SpecificMangaChapters($id: Int!) {
+  manga(id: $id) {
+    chapters {
+      nodes {
+        chapterNumber
+        id
+        name
+        scanlator
+      }
+    }
+  }
+}
