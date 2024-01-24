@@ -7,12 +7,13 @@ use anyhow::{anyhow, Error, Result};
 use askama::Template;
 use axum::{
     debug_handler,
-    extract::{Form, Path, Query},
+    extract::{Path, Query},
     http::StatusCode,
     response::{Html, IntoResponse, Response},
     routing::{get, post},
     Extension, Router,
 };
+use axum_extra::extract::Form;
 use config::{builder::DefaultState, ConfigBuilder, ConfigError, Environment, File};
 use graphql_client::{reqwest::post_graphql, GraphQLQuery};
 use manga_search_by_title::MangaSearchByTitleMangasNodes;
@@ -257,11 +258,7 @@ async fn get_chapters_by_manga_id(
 
 #[derive(Deserialize)]
 struct ChapterSelectInput {
-    #[serde(
-        rename = "selected_items[]",
-        flatten,
-        deserialize_with = "util::deserialize_items"
-    )]
+    #[serde(default)]
     selected_items: Vec<String>,
     page_control: Option<String>,
 }
@@ -283,7 +280,7 @@ async fn post_chapters_by_manga_id(
     let api_base = &shared_state.config.read().await.suwayomi_url;
 
     let limit = 20;
-    let mut offset: SessionOffset = session
+    let offset: SessionOffset = session
         .get(SESSION_OFFSET_KEY)
         .await
         .unwrap()
@@ -327,29 +324,20 @@ async fn post_chapters_by_manga_id(
     };
 
     session_selected_chapters.insert(prev_page_offset, new_chapters_selected);
+
     session
         .insert(
             SESSION_SELECTED_CHAPTERS_KEY,
             SessionSelectedChapters(session_selected_chapters),
         )
         .await?;
+    session.insert(SESSION_OFFSET_KEY, new_current_page).await?;
 
-    session
-        .insert(SESSION_OFFSET_KEY, new_current_page)
-        .await
-        .unwrap();
-
-    offset = session
-        .get(SESSION_OFFSET_KEY)
-        .await
-        .unwrap()
-        .unwrap_or_default();
-
-    let end = offset.0 + limit;
+    let end = new_current_page + limit;
 
     let (title, chapters) = get_chapters_by_id(params.0, api_base).await?;
     // CQ: TODO avoid this copy
-    let items = chapters[offset.0..end].to_vec();
+    let items = chapters[new_current_page..end].to_vec();
 
     Ok(ChapterSelectTemplate {
         mangaId: params.0,

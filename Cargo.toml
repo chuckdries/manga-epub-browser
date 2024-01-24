@@ -10,10 +10,12 @@ anyhow = "1.0.79"
 askama = { version = "0.12.1", features = ["with-axum"] }
 askama_axum = "0.4.0"
 axum = { version = "0.7.4", features = ["macros", "form"] }
+axum-extra = { version = "0.9.2", features = ["form"] }
 config = "0.13.4"
 graphql_client = { version = "0.13.0", features = ["reqwest"] }
 reqwest = "0.11.23"
 serde = { version = "1.0.195", features = ["derive"] }
+serde_html_form = "0.2.3"
 tokio = { version = "1.35.1", features = ["macros", "rt-multi-thread"] }
 tower = "0.4.13"
 tower-sessions = "0.9.1"
