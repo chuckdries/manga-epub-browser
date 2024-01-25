@@ -257,6 +257,16 @@ async fn post_chapters_by_manga_id(
                 prev_page_offset,
             );
 
+            // CQ: plan
+            // 1. Create Book in database with mangaid and selected chapters
+            // 2. prompt user for book title (default: Title + chapter range)
+            // 3. compile book
+            //    1. instruct suwayomi to download chapters from source
+            //    2. fetch chapter pages from suwayomi
+            //    3. assemble epub
+            // 4. offer for download
+            // book will include status field
+            // homepage will list books and their statuses
             download_chapters(all_chapters, &api_base).await?;
             return Ok(PostChapterResponse::StringResponse(format!(
                 "asdf",
