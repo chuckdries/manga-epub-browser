@@ -8,4 +8,4 @@ Note to self: my suwayomi-server instance is http://10.10.11.250:4567/api/graphq
 
 ### Migrations
 
-Migrations are handled with sqlx-cli. Create a database file by running `sqlx database create`
+Migrations are handled with sqlx-cli. Create a database file by running `mkdir data && sqlx database create && sqlx migrate run`
