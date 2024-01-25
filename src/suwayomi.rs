@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::{collections::HashSet, env};
 
 use anyhow::{anyhow, Error, Result};
 use graphql_client::{reqwest::post_graphql, GraphQLQuery};
@@ -16,13 +16,12 @@ pub struct MangaSearchByTitle;
 
 pub async fn search_manga_by_title(
     variables: manga_search_by_title::Variables,
-    base_url: &str,
 ) -> Result<Vec<manga_search_by_title::MangaSearchByTitleMangasNodes>, Error> {
     let client = reqwest::Client::new();
 
     return match post_graphql::<MangaSearchByTitle, _>(
         &client,
-        join_url(base_url, "/api/graphql")?,
+        join_url(&env::var("SUWAYOMI_URL")?, "/api/graphql")?,
         variables,
     )
     .await?
@@ -43,13 +42,12 @@ pub struct SpecificMangaById;
 
 pub async fn get_manga_by_id(
     id: i64,
-    base_url: &str,
 ) -> Result<specific_manga_by_id::SpecificMangaByIdManga, Error> {
     let client = reqwest::Client::new();
 
     return match post_graphql::<SpecificMangaById, _>(
         &client,
-        join_url(base_url, "/api/graphql")?,
+        join_url(&env::var("SUWAYOMI_URL")?, "/api/graphql")?,
         specific_manga_by_id::Variables { id },
     )
     .await?
@@ -70,7 +68,6 @@ pub struct SpecificMangaChapters;
 
 pub async fn get_chapters_by_id(
     id: i64,
-    base_url: &str,
 ) -> Result<
     (
         String,
@@ -82,7 +79,7 @@ pub async fn get_chapters_by_id(
 
     return match post_graphql::<SpecificMangaChapters, _>(
         &client,
-        join_url(base_url, "/api/graphql")?,
+        join_url(&env::var("SUWAYOMI_URL")?, "/api/graphql")?,
         specific_manga_chapters::Variables { id },
     )
     .await?
@@ -117,13 +114,13 @@ pub struct DownloadChapters;
 )]
 pub struct CheckOnDownloadProgress;
 
-pub async fn download_chapters(ids: HashSet<i64>, base_url: &str) -> Result<(), Error> {
+pub async fn download_chapters(ids: HashSet<i64>) -> Result<(), Error> {
     let client = reqwest::Client::new();
 
     dbg!(&ids);
     let chapters_download_status = match post_graphql::<CheckChaptersDownloaded, _>(
         &client,
-        join_url(base_url, "/api/graphql")?,
+        join_url(&env::var("SUWAYOMI_URL")?, "/api/graphql")?,
         check_chapters_downloaded::Variables {
             ids: ids.into_iter().collect(),
         },
@@ -145,12 +142,12 @@ pub async fn download_chapters(ids: HashSet<i64>, base_url: &str) -> Result<(), 
 
     if chapters_to_download.len() == 0 {
         println!("Skipped downloading - all chapters already downloaded");
-        return Ok(())
+        return Ok(());
     }
 
     let res = post_graphql::<DownloadChapters, _>(
         &client,
-        join_url(base_url, "/api/graphql")?,
+        join_url(&env::var("SUWAYOMI_URL")?, "/api/graphql")?,
         download_chapters::Variables {
             ids: chapters_to_download,
         },
@@ -162,7 +159,7 @@ pub async fn download_chapters(ids: HashSet<i64>, base_url: &str) -> Result<(), 
     loop {
         let downloader_state = match post_graphql::<CheckOnDownloadProgress, _>(
             &client,
-            join_url(base_url, "/api/graphql")?,
+            join_url(&env::var("SUWAYOMI_URL")?, "/api/graphql")?,
             check_on_download_progress::Variables {},
         )
         .await?
