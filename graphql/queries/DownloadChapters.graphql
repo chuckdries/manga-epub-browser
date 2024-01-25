@@ -1,0 +1,12 @@
+mutation DownloadChapters($ids: [Int!]!) {
+  enqueueChapterDownloads(input: {ids: $ids}) {
+    downloadStatus {
+      state
+    }
+  }
+  startDownloader(input: {}) {
+    downloadStatus {
+      state
+    }
+  }
+}

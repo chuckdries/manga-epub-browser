@@ -1,0 +1,12 @@
+query CheckOnDownloadProgress {
+  downloadStatus {
+    state
+    queue {
+      progress
+      state
+      chapter {
+        id
+      }
+    }
+  }
+}

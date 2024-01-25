@@ -1,0 +1,8 @@
+query CheckChaptersDownloaded($ids: [Int!]!) {
+  chapters(filter: {id: {in: $ids}}) {
+    nodes {
+      id,
+      isDownloaded
+    }
+  }
+}

@@ -7,7 +7,7 @@ use anyhow::{anyhow, Error, Result};
 use askama::Template;
 use axum::{
     debug_handler,
-    extract::{Path, Query},
+    extract::{Path, Query, State},
     http::StatusCode,
     response::{Html, IntoResponse, Response},
     routing::{get, post},
@@ -15,14 +15,13 @@ use axum::{
 };
 use axum_extra::extract::Form;
 use config::{builder::DefaultState, ConfigBuilder, ConfigError, Environment, File};
-use graphql_client::{reqwest::post_graphql, GraphQLQuery};
-use manga_search_by_title::MangaSearchByTitleMangasNodes;
-use reqwest;
 use serde::{Deserialize, Serialize};
+use suwayomi::download_chapters;
+// use suwayomi::get_chapters_by_id;
 use tokio::sync::RwLock;
 use tower_sessions::{cookie::time::Duration, Expiry, MemoryStore, Session, SessionManagerLayer};
-use util::join_url;
 
+mod suwayomi;
 mod util; // Declare the util module
 
 #[derive(Deserialize)]
@@ -86,40 +85,11 @@ async fn not_found() -> Html<&'static str> {
     Html("<h1>404 Not found</h1><a href=\"/\">Back home</a>")
 }
 
-// The paths are relative to the directory where your `Cargo.toml` is located.
-// Both json and the GraphQL schema language are supported as sources for the schema
-#[derive(GraphQLQuery)]
-#[graphql(
-    schema_path = "graphql/schema.json",
-    query_path = "graphql/queries/MangaSearchByTitle.graphql",
-    response_derives = "Debug"
-)]
-pub struct MangaSearchByTitle;
-
-async fn search_manga_by_title(
-    variables: manga_search_by_title::Variables,
-    base_url: &str,
-) -> Result<Vec<manga_search_by_title::MangaSearchByTitleMangasNodes>, Error> {
-    let client = reqwest::Client::new();
-
-    return match post_graphql::<MangaSearchByTitle, _>(
-        &client,
-        join_url(base_url, "/api/graphql")?,
-        variables,
-    )
-    .await?
-    .data
-    {
-        Some(data) => Ok(data.mangas.nodes),
-        None => Err(anyhow!("Missing response data")),
-    };
-}
-
 #[derive(Template)]
 #[template(path = "search-results.html")]
 struct SearchResultsTemplate {
     title: String,
-    mangas: Vec<MangaSearchByTitleMangasNodes>,
+    mangas: Vec<suwayomi::manga_search_by_title::MangaSearchByTitleMangasNodes>,
     api_base: String,
 }
 
@@ -130,8 +100,8 @@ async fn search_results(
 ) -> Result<SearchResultsTemplate, AppError> {
     let api_base = &shared_state.config.read().await.suwayomi_url;
     let title = params.get("title").unwrap().to_string();
-    let res = search_manga_by_title(
-        manga_search_by_title::Variables {
+    let res = suwayomi::search_manga_by_title(
+        suwayomi::manga_search_by_title::Variables {
             title: title.clone(),
         },
         api_base,
@@ -144,37 +114,10 @@ async fn search_results(
     })
 }
 
-#[derive(GraphQLQuery)]
-#[graphql(
-    schema_path = "graphql/schema.json",
-    query_path = "graphql/queries/SpecificMangaById.graphql",
-    response_derives = "Debug"
-)]
-pub struct SpecificMangaById;
-
-async fn get_manga_by_id(
-    id: i64,
-    base_url: &str,
-) -> Result<specific_manga_by_id::SpecificMangaByIdManga, Error> {
-    let client = reqwest::Client::new();
-
-    return match post_graphql::<SpecificMangaById, _>(
-        &client,
-        join_url(base_url, "/api/graphql")?,
-        specific_manga_by_id::Variables { id },
-    )
-    .await?
-    .data
-    {
-        Some(data) => Ok(data.manga),
-        None => Err(anyhow!("Missing response data")),
-    };
-}
-
 #[derive(Template)]
 #[template(path = "manga-page.html")]
 struct MangaPageTemplate {
-    manga: specific_manga_by_id::SpecificMangaByIdManga,
+    manga: suwayomi::specific_manga_by_id::SpecificMangaByIdManga,
     api_base: String,
 }
 
@@ -184,44 +127,11 @@ async fn manga_by_id(
     params: Path<i64>,
 ) -> Result<MangaPageTemplate, AppError> {
     let api_base = &shared_state.config.read().await.suwayomi_url;
-    let manga = get_manga_by_id(params.0, api_base).await?;
+    let manga = suwayomi::get_manga_by_id(params.0, api_base).await?;
     Ok(MangaPageTemplate {
         manga,
         api_base: api_base.clone(),
     })
-}
-
-#[derive(GraphQLQuery)]
-#[graphql(
-    schema_path = "graphql/schema.json",
-    query_path = "graphql/queries/SpecificMangaChapters.graphql",
-    response_derives = "Debug,Clone"
-)]
-pub struct SpecificMangaChapters;
-
-async fn get_chapters_by_id(
-    id: i64,
-    base_url: &str,
-) -> Result<
-    (
-        String,
-        Vec<specific_manga_chapters::SpecificMangaChaptersMangaChaptersNodes>,
-    ),
-    Error,
-> {
-    let client = reqwest::Client::new();
-
-    return match post_graphql::<SpecificMangaChapters, _>(
-        &client,
-        join_url(base_url, "/api/graphql")?,
-        specific_manga_chapters::Variables { id },
-    )
-    .await?
-    .data
-    {
-        Some(data) => Ok((data.manga.title, data.manga.chapters.nodes)),
-        None => Err(anyhow!("Missing response data")),
-    };
 }
 
 #[derive(Template)]
@@ -229,7 +139,7 @@ async fn get_chapters_by_id(
 struct ChapterSelectTemplate {
     manga_id: i64,
     title: String,
-    items: Vec<specific_manga_chapters::SpecificMangaChaptersMangaChaptersNodes>,
+    items: Vec<suwayomi::specific_manga_chapters::SpecificMangaChaptersMangaChaptersNodes>,
     selected: HashSet<i64>,
     limit: usize,
     offset: usize,
@@ -241,7 +151,7 @@ async fn get_chapters_by_manga_id(
     params: Path<i64>,
 ) -> Result<ChapterSelectTemplate, AppError> {
     let api_base = &shared_state.config.read().await.suwayomi_url;
-    let (title, chapters) = get_chapters_by_id(params.0, api_base).await?;
+    let (title, chapters) = suwayomi::get_chapters_by_id(params.0, api_base).await?;
     let limit = 20;
     let offset = 0;
     // CQ: TODO avoid this copy
@@ -346,9 +256,10 @@ async fn post_chapters_by_manga_id(
                 new_chapters_selected,
                 prev_page_offset,
             );
+
+            download_chapters(all_chapters, &api_base).await?;
             return Ok(PostChapterResponse::StringResponse(format!(
-                "{:#?}",
-                all_chapters
+                "asdf",
             )));
         }
     };
@@ -371,7 +282,7 @@ async fn post_chapters_by_manga_id(
 
     let end = new_current_page + limit;
 
-    let (title, chapters) = get_chapters_by_id(params.0, api_base).await?;
+    let (title, chapters) = suwayomi::get_chapters_by_id(params.0, api_base).await?;
     // CQ: TODO avoid this copy
     let items = chapters[new_current_page..end].to_vec();
 
@@ -416,6 +327,7 @@ async fn main() {
         .route("/manga/:id/chapters", get(get_chapters_by_manga_id))
         .route("/manga/:id/chapters", post(post_chapters_by_manga_id))
         .fallback(not_found)
+        // CQ: TODO move to State extractor
         .layer(Extension(state.clone()))
         .layer(session_layer);
 
