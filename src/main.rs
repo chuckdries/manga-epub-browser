@@ -311,6 +311,13 @@ async fn main() {
             .await
             .expect("Failed to create pool.");
 
+    println!("running migrations");
+
+    match sqlx::migrate!().run(&pool).await {
+        Ok(()) => println!("migrations succeeded"),
+        Err(msg) => panic!("{}", msg)
+    };
+
     let session_store = MemoryStore::default();
     let session_layer = SessionManagerLayer::new(session_store)
         .with_secure(false)
