@@ -62,13 +62,14 @@ pub async fn get_book_with_chapters_by_id(
     if book_chapters.len() == 0 {
         return Ok(None);
     }
-    dbg!(&book_chapters);
     let mut chapters: HashSet<i64> = HashSet::new();
     let mut manga_id: i64 = 0;
     book_chapters.iter().for_each(|chapter| {
         manga_id = chapter.manga_id.expect("Book missing manga_id");
         chapters.insert(chapter.chapter_id.expect("BookChapter missing chapter_id"));
     });
+
+    dbg!(&chapters);
 
     Ok(Some(Book {
         id,
