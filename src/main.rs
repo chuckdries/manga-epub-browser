@@ -1,9 +1,4 @@
 extern crate dotenv;
-use std::{
-    collections::{HashMap, HashSet},
-    net::SocketAddr,
-    sync::Arc,
-};
 use anyhow::{anyhow, Error, Result};
 use askama::Template;
 use axum::{
@@ -15,20 +10,26 @@ use axum::{
     Extension, Router,
 };
 use axum_extra::extract::Form;
-use ebook::commit_chapter_selection;
+use ebook::{commit_chapter_selection, get_book_with_chapters_by_id};
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
+use std::{
+    collections::{HashMap, HashSet},
+    i64::MAX,
+    net::SocketAddr,
+    sync::Arc,
+};
 // use suwayomi::download_chapters;
 // use suwayomi::get_chapters_by_id;
 use dotenv::dotenv;
 use std::env;
+use suwayomi::{get_manga_by_id, specific_manga_by_id};
 // use tokio::sync::RwLock;
 use tower_sessions::{cookie::time::Duration, Expiry, MemoryStore, Session, SessionManagerLayer};
 
 mod ebook;
 mod suwayomi;
 mod util; // Declare the util module
-
 
 // struct AppState {
 //     config: RwLock<AppConfig>, // Use RwLock for thread-safe access
@@ -87,11 +88,9 @@ async fn search_results(
     Query(params): Query<HashMap<String, String>>,
 ) -> Result<SearchResultsTemplate, AppError> {
     let title = params.get("title").unwrap().to_string();
-    let res = suwayomi::search_manga_by_title(
-        suwayomi::manga_search_by_title::Variables {
-            title: title.clone(),
-        },
-    )
+    let res = suwayomi::search_manga_by_title(suwayomi::manga_search_by_title::Variables {
+        title: title.clone(),
+    })
     .await?;
     Ok(SearchResultsTemplate {
         title: title,
@@ -108,9 +107,7 @@ struct MangaPageTemplate {
 }
 
 #[debug_handler]
-async fn manga_by_id(
-    params: Path<i64>,
-) -> Result<MangaPageTemplate, AppError> {
+async fn manga_by_id(params: Path<i64>) -> Result<MangaPageTemplate, AppError> {
     let manga = suwayomi::get_manga_by_id(params.0).await?;
     Ok(MangaPageTemplate {
         manga,
@@ -130,10 +127,8 @@ struct ChapterSelectTemplate {
 }
 
 #[debug_handler]
-async fn get_chapters_by_manga_id(
-    params: Path<i64>,
-) -> Result<ChapterSelectTemplate, AppError> {
-    let (title, chapters) = suwayomi::get_chapters_by_id(params.0).await?;
+async fn get_chapters_by_manga_id(params: Path<i64>) -> Result<ChapterSelectTemplate, AppError> {
+    let (title, chapters) = suwayomi::get_chapters_by_manga_id(params.0).await?;
     let limit = 20;
     let offset = 0;
     // CQ: TODO avoid this copy
@@ -276,7 +271,7 @@ async fn post_chapters_by_manga_id(
 
     let end = new_current_page + limit;
 
-    let (title, chapters) = suwayomi::get_chapters_by_id(params.0).await?;
+    let (title, chapters) = suwayomi::get_chapters_by_manga_id(params.0).await?;
     // CQ: TODO avoid this copy
     let items = chapters[new_current_page..end].to_vec();
 
@@ -290,6 +285,47 @@ async fn post_chapters_by_manga_id(
             selected: previously_selected_chapters,
         },
     ))
+}
+
+#[derive(Template)]
+#[template(path = "configure-book.html")]
+struct ConfigureBookTemplate {
+    id: i64,
+    default_title: String,
+    default_author: String,
+}
+
+#[debug_handler]
+async fn get_configure_book(
+    params: Path<i64>,
+    Extension(pool): Extension<SqlitePool>,
+) -> Result<ConfigureBookTemplate, AppError> {
+    let book = match get_book_with_chapters_by_id(pool, params.0).await? {
+        Some(book) => Ok(book),
+        None => Err(anyhow!("Book not found")),
+    }?;
+    let manga = get_manga_by_id(book.manga_id).await?;
+    let default_author = match manga.author {
+        Some(author) => author,
+        None => "".to_string(),
+    };
+
+    // TODO get chapterNumbers from chapter ids
+    let (min, max): (i64, i64) = book.chapters.into_iter().fold((MAX, 0), |acc, x| {
+        if x < acc.0 {
+            return (x, acc.1);
+        }
+        if x > acc.1 {
+            return (acc.0, x);
+        }
+        return acc;
+    });
+
+    Ok(ConfigureBookTemplate {
+        id: params.0,
+        default_author,
+        default_title: format!("{} ({}-{})", manga.title, min, max),
+    })
 }
 
 #[derive(Template)]
@@ -315,7 +351,7 @@ async fn main() {
 
     match sqlx::migrate!().run(&pool).await {
         Ok(()) => println!("migrations succeeded"),
-        Err(msg) => panic!("{}", msg)
+        Err(msg) => panic!("{}", msg),
     };
 
     let session_store = MemoryStore::default();
@@ -330,6 +366,7 @@ async fn main() {
         .route("/manga/:id", get(manga_by_id))
         .route("/manga/:id/chapters", get(get_chapters_by_manga_id))
         .route("/manga/:id/chapters", post(post_chapters_by_manga_id))
+        .route("/configure-book/:id", get(get_configure_book))
         .fallback(not_found)
         .layer(Extension(pool))
         .layer(session_layer);

@@ -4,7 +4,7 @@ use anyhow::{anyhow, Error, Result};
 use graphql_client::{reqwest::post_graphql, GraphQLQuery};
 use tokio::time::{sleep, Duration};
 
-use crate::{suwayomi::check_on_download_progress::DownloaderState, util::join_url};
+use crate::{suwayomi::check_on_download_progress::DownloaderState, util::join_url, AppError};
 
 #[derive(GraphQLQuery)]
 #[graphql(
@@ -66,7 +66,7 @@ pub async fn get_manga_by_id(
 )]
 pub struct SpecificMangaChapters;
 
-pub async fn get_chapters_by_id(
+pub async fn get_chapters_by_manga_id(
     id: i64,
 ) -> Result<
     (
@@ -181,5 +181,10 @@ pub async fn download_chapters(ids: HashSet<i64>) -> Result<(), Error> {
 
     println!("download complete");
 
+    Ok(())
+}
+
+// CQ: TODO
+pub async fn get_chapters_by_ids(ids: HashSet<i64>) -> Result<(), AppError> {
     Ok(())
 }
