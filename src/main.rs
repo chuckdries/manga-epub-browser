@@ -12,6 +12,7 @@ use axum::{
 use axum_extra::extract::Form;
 use ebook::{commit_chapter_selection, get_book_with_chapters_by_id};
 use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
 use sqlx::SqlitePool;
 use std::{
     collections::{HashMap, HashSet},
@@ -25,11 +26,16 @@ use dotenv::dotenv;
 use std::env;
 use suwayomi::{get_manga_by_id, specific_manga_by_id};
 // use tokio::sync::RwLock;
+use handlebars::{handlebars_helper, DirectorySourceOptions, Handlebars};
+use tower_http::services::ServeDir;
 use tower_sessions::{cookie::time::Duration, Expiry, MemoryStore, Session, SessionManagerLayer};
 
 mod ebook;
 mod suwayomi;
 mod util; // Declare the util module
+
+extern crate pretty_env_logger;
+#[macro_use] extern crate log;
 
 // struct AppState {
 //     config: RwLock<AppConfig>, // Use RwLock for thread-safe access
@@ -75,28 +81,44 @@ async fn not_found() -> Html<&'static str> {
     Html("<h1>404 Not found</h1><a href=\"/\">Back home</a>")
 }
 
-#[derive(Template)]
-#[template(path = "search-results.html")]
+// #[derive(Template)]
+// #[template(path = "search-results.html")]
+#[derive(Serialize)]
 struct SearchResultsTemplate {
     title: String,
     mangas: Vec<suwayomi::manga_search_by_title::MangaSearchByTitleMangasNodes>,
     api_base: String,
+    parent: String,
 }
 
 #[debug_handler]
 async fn search_results(
     Query(params): Query<HashMap<String, String>>,
-) -> Result<SearchResultsTemplate, AppError> {
+    handlebars: Extension<Arc<Handlebars<'static>>>,
+) -> Result<Html<String>, AppError> {
     let title = params.get("title").unwrap().to_string();
     let res = suwayomi::search_manga_by_title(suwayomi::manga_search_by_title::Variables {
         title: title.clone(),
     })
     .await?;
-    Ok(SearchResultsTemplate {
-        title: title,
+
+    let data = SearchResultsTemplate {
+        title,
         mangas: res,
         api_base: env::var("SUWAYOMI_URL")?,
-    })
+        parent: "layouts/main".to_string(),
+    };
+
+    match handlebars.render("search-results", &data) {
+        Ok(rendered) => Ok(Html(rendered)),
+        Err(msg) => Err(AppError(anyhow!(msg))),
+    }
+
+    // Ok(SearchResultsTemplate {
+    //     title: title,
+    //     mangas: res,
+    //     api_base: env::var("SUWAYOMI_URL")?,
+    // })
 }
 
 #[derive(Template)]
@@ -333,13 +355,17 @@ async fn get_configure_book(
 struct HomeTemplate {}
 
 #[debug_handler]
-async fn home() -> Result<HomeTemplate, AppError> {
-    Ok(HomeTemplate {})
+async fn home(handlebars: Extension<Arc<Handlebars<'static>>>) -> Result<Html<String>, AppError> {
+    match handlebars.render("home", &()) {
+        Ok(rendered) => Ok(Html(rendered)),
+        Err(msg) => Err(AppError(anyhow!(msg))),
+    }
 }
 
 #[tokio::main]
 async fn main() {
     dotenv().ok();
+    pretty_env_logger::init();
 
     // Create a connection pool
     let pool =
@@ -359,6 +385,29 @@ async fn main() {
         .with_secure(false)
         .with_expiry(Expiry::OnInactivity(Duration::days(14)));
 
+    let mut handlebars = Handlebars::new();
+    handlebars.set_dev_mode(true);
+    
+    handlebars_helper!(json: |v: Value| v.to_string());
+    handlebars.register_helper("json", Box::new(json));
+
+    match handlebars.register_templates_directory(
+        "templates",
+        DirectorySourceOptions {
+            tpl_extension: ".hbs".to_string(),
+            hidden: false,
+            temporary: false,
+        },
+    ) {
+        Ok(()) => println!("templates loaded"),
+        Err(msg) => panic!("{}", msg),
+    };
+
+    // handlebars.register_script_helper_file(name, script_path)
+
+    let handlebars = Arc::new(handlebars);
+
+
     // build our application with a single route
     let app = Router::new()
         .route("/", get(home))
@@ -367,8 +416,10 @@ async fn main() {
         .route("/manga/:id/chapters", get(get_chapters_by_manga_id))
         .route("/manga/:id/chapters", post(post_chapters_by_manga_id))
         .route("/configure-book/:id", get(get_configure_book))
+        .nest_service("/public", ServeDir::new("public"))
         .fallback(not_found)
         .layer(Extension(pool))
+        .layer(Extension(handlebars))
         .layer(session_layer);
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();

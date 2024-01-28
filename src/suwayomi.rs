@@ -10,7 +10,7 @@ use crate::{suwayomi::check_on_download_progress::DownloaderState, util::join_ur
 #[graphql(
     schema_path = "graphql/schema.json",
     query_path = "graphql/queries/MangaSearchByTitle.graphql",
-    response_derives = "Debug"
+    response_derives = "Debug,Serialize"
 )]
 pub struct MangaSearchByTitle;
 
