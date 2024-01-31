@@ -1,8 +1,8 @@
 CREATE TABLE Books(
   id INTEGER PRIMARY KEY,
-  manga_id INTEGER,
-  title STRING NOT NULL,
-  author STRING NOT NULL,
+  manga_id INTEGER NOT NULL,
+  title TEXT NOT NULL,
+  author TEXT NOT NULL,
   -- 1: draft
   status INTEGER NOT NULL
 );

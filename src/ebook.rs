@@ -53,14 +53,9 @@ pub struct Book {
 }
 
 pub async fn get_book_by_id(pool: SqlitePool, id: i64) -> Result<Option<Book>, AppError> {
-    let book: Book = sqlx::query_as(
-        r#"
-        SELECT id, manga_id, title, author, status 
-        FROM Books WHERE Books.id = ?"#,
-    )
-    .bind(id)
-    .fetch_one(&pool)
-    .await?;
+    let book = sqlx::query_as!(Book, r#" SELECT * FROM Books WHERE Books.id = ?"#, id)
+        .fetch_one(&pool)
+        .await?;
     Ok(Some(book))
 }
 
@@ -75,7 +70,7 @@ pub async fn get_book_with_chapters_by_id(
 ) -> Result<Option<BookWithChapters>, AppError> {
     let book_chapters = sqlx::query!(
         r#"
-    SELECT Books.manga_id, Books.title as "title?: String", Books.author as "author?: String", Books.status, BookChapters.chapter_id 
+    SELECT Books.manga_id, Books.title, Books.author, Books.status, BookChapters.chapter_id 
     FROM Books 
     LEFT JOIN BookChapters WHERE BookChapters.book_id = Books.id 
     AND Books.id = ?"#,
@@ -91,15 +86,13 @@ pub async fn get_book_with_chapters_by_id(
     let mut book: Option<Book> = None;
     book_chapters.iter().for_each(|chapter| {
         if book.is_none() {
-            if chapter.title.is_some() && chapter.author.is_some() && chapter.manga_id.is_some() {
-                book = Some(Book {
-                    id,
-                    manga_id: chapter.manga_id.unwrap(),
-                    title: chapter.title.to_owned().unwrap(),
-                    author: chapter.author.to_owned().unwrap(),
-                    status: chapter.status.to_owned(),
-                });
-            }
+            book = Some(Book {
+                id,
+                manga_id: chapter.manga_id,
+                title: chapter.title.to_owned(),
+                author: chapter.author.to_owned(),
+                status: chapter.status.to_owned(),
+            });
         }
         chapters.insert(chapter.chapter_id.expect("BookChapter missing chapter_id"));
     });
