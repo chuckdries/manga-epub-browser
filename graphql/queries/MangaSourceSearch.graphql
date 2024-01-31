@@ -1,0 +1,10 @@
+mutation MangaSourceSearch($input: FetchSourceMangaInput!) {
+  fetchSourceManga(input: $input) {
+    hasNextPage
+    mangas {
+      id
+      title
+      thumbnailUrl
+    }
+  }
+}

@@ -14,12 +14,21 @@ use crate::{suwayomi::check_on_download_progress::DownloaderState, util::join_ur
 )]
 pub struct MangaSearchByTitle;
 
+type LongString = String;
+#[derive(GraphQLQuery)]
+#[graphql(
+    schema_path = "graphql/schema.json",
+    query_path = "graphql/queries/MangaSourceSearch.graphql",
+    response_derives = "Debug,Serialize"
+)]
+pub struct MangaSourceSearch;
+
 pub async fn search_manga_by_title(
-    variables: manga_search_by_title::Variables,
-) -> Result<Vec<manga_search_by_title::MangaSearchByTitleMangasNodes>, Error> {
+    variables: manga_source_search::Variables,
+) -> Result<Vec<manga_source_search::MangaSourceSearchFetchSourceMangaMangas>, Error> {
     let client = reqwest::Client::new();
 
-    return match post_graphql::<MangaSearchByTitle, _>(
+    return match post_graphql::<MangaSourceSearch, _>(
         &client,
         join_url(&env::var("SUWAYOMI_URL")?, "/api/graphql")?,
         variables,
@@ -27,7 +36,7 @@ pub async fn search_manga_by_title(
     .await?
     .data
     {
-        Some(data) => Ok(data.mangas.nodes),
+        Some(data) => Ok(data.fetch_source_manga.mangas),
         None => Err(anyhow!("Missing response data")),
     };
 }

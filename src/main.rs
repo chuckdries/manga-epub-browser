@@ -95,7 +95,7 @@ async fn not_found() -> Html<&'static str> {
 #[derive(Serialize)]
 struct SearchResultsTemplate {
     title: String,
-    mangas: Vec<suwayomi::manga_search_by_title::MangaSearchByTitleMangasNodes>,
+    mangas: Vec<suwayomi::manga_source_search::MangaSourceSearchFetchSourceMangaMangas>,
     api_base: String,
 }
 
@@ -105,8 +105,15 @@ async fn search_results(
     handlebars: Extension<Arc<Handlebars<'static>>>,
 ) -> AppResponse {
     let title = params.get("title").unwrap().to_string();
-    let res = suwayomi::search_manga_by_title(suwayomi::manga_search_by_title::Variables {
-        title: title.clone(),
+    let res = suwayomi::search_manga_by_title(suwayomi::manga_source_search::Variables {
+        input: suwayomi::manga_source_search::FetchSourceMangaInput {
+            type_: suwayomi::manga_source_search::FetchSourceMangaType::SEARCH,
+            client_mutation_id: None,
+            query: Some(title.clone()),
+            filters: Box::new(None),
+            page: 1,
+            source: "2499283573021220255".to_string()
+        }
     })
     .await?;
 
