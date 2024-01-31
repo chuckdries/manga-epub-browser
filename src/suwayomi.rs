@@ -198,8 +198,7 @@ pub async fn get_chapters_by_ids(ids: &HashSet<i64>) -> Result<Option<chapters_b
     match post_graphql::<ChaptersByIds, _>(
         &client,
         join_url(&env::var("SUWAYOMI_URL")?, "/api/graphql")?,
-        // CQ: TODO avoid this copy
-        chapters_by_ids::Variables { ids: Some(ids.clone().into_iter().collect()) },
+        chapters_by_ids::Variables { ids: Some(ids.into_iter().cloned().collect()) },
     )
     .await?
     .data
