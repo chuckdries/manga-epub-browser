@@ -1,3 +1,15 @@
+{% extends "base.html" %} {% block title %}Configure Book{% endblock %} {% block
+head %} 
+<style>
+li {
+  list-style-type: none;
+  margin: 1em 0;
+}
+ul {
+  padding: 0;
+}
+</style>
+{% endblock %} {% block content %}
 <h1>Select chapters from {{ title }}</h1>
 
 <form
@@ -5,20 +17,39 @@
   action="/manga/{{ manga_id }}/chapters"
   method="post"
 >
-  <button type="submit" name="special_selection" value="all">select all</button>
+  <button
+    onclick="document.querySelectorAll('.chapter-item').forEach(item => item.checked = true)"
+    type="button"
+  >
+    select all on page
+  </button>
+  <button
+    onclick="document.querySelectorAll('.chapter-item').forEach(item => item.checked = false)"
+    type="button"
+  >
+    select none on page
+  </button>
 
   <!-- Item Selection Checkboxes -->
   <ul>
     {% for item in items %}
     <li>
-      <label>
+      <label style="display: flex;">
         <input
+          class="chapter-item"
           type="checkbox"
           name="selected_items"
           value="{{item.id}}"
-          {% if selected.contains(item.id) %} checked {% endif %}
+          {% if selected.contains(item.id) %}
+          checked
+          {% endif %}
         />
-        {{item.name}}
+        <div style="display: flex; flex-direction: column;">
+        <span>{{item.name}}</span>
+        {% if let Some(scanlator) = item.scanlator %}
+        <span>{{scanlator}}</span>
+        {% endif %}
+        </div>
       </label>
     </li>
     {% endfor %}
@@ -29,3 +60,4 @@
   <button type="submit" name="page_control" value="next">Next</button>
   <button type="submit">Download selection</button>
 </form>
+{% endblock %}
