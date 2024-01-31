@@ -45,6 +45,15 @@ extern crate pretty_env_logger;
 // Make our own error that wraps `anyhow::Error`.
 struct AppError(anyhow::Error);
 
+type AppResponse = Result<Html<String>, AppError>;
+
+fn render<T: Serialize>(hbs: &Handlebars<'static>, name: &str, data: &T) -> AppResponse {
+    match hbs.render(name, data) {
+        Ok(rendered) => Ok(Html(rendered)),
+        Err(msg) => Err(AppError(anyhow!(msg))),
+    }
+}
+
 #[derive(Template)]
 #[template(path = "error.html")]
 struct ErrorPageTemplate {
@@ -88,14 +97,13 @@ struct SearchResultsTemplate {
     title: String,
     mangas: Vec<suwayomi::manga_search_by_title::MangaSearchByTitleMangasNodes>,
     api_base: String,
-    parent: String,
 }
 
 #[debug_handler]
 async fn search_results(
     Query(params): Query<HashMap<String, String>>,
     handlebars: Extension<Arc<Handlebars<'static>>>,
-) -> Result<Html<String>, AppError> {
+) -> AppResponse {
     let title = params.get("title").unwrap().to_string();
     let res = suwayomi::search_manga_by_title(suwayomi::manga_search_by_title::Variables {
         title: title.clone(),
@@ -106,14 +114,9 @@ async fn search_results(
         title,
         mangas: res,
         api_base: env::var("SUWAYOMI_URL")?,
-        parent: "layouts/main".to_string(),
     };
 
-    match handlebars.render("search-results", &data) {
-        Ok(rendered) => Ok(Html(rendered)),
-        Err(msg) => Err(AppError(anyhow!(msg))),
-    }
-
+    render(&handlebars, "search-results", &data)
     // Ok(SearchResultsTemplate {
     //     title: title,
     //     mangas: res,
@@ -230,6 +233,7 @@ async fn post_chapters_by_manga_id(
     session: Session,
     Form(data): Form<ChapterSelectInput>,
 ) -> Result<PostChapterResponse, AppError> {
+    let manga_id = params.0;
     let limit = 20;
     let offset: SessionOffset = session
         .get(SESSION_OFFSET_KEY)
@@ -266,7 +270,26 @@ async fn post_chapters_by_manga_id(
                 prev_page_offset,
             );
 
-            let book_id = commit_chapter_selection(pool, all_chapters, params.0).await?;
+            let manga = get_manga_by_id(manga_id).await?;
+            let default_author = match manga.author {
+                Some(author) => author,
+                None => "".to_string(),
+            };
+        
+            // TODO get chapterNumbers from chapter ids
+            let (min, max): (i64, i64) = all_chapters.iter().fold((MAX, 0), |acc, x| {
+                if x < &acc.0 {
+                    return (*x, acc.1);
+                }
+                if x > &acc.1 {
+                    return (acc.0, *x);
+                }
+                return acc;
+            });
+        
+            let default_title = format!("{} ({}-{})", manga.title, min, max);
+
+            let book_id = commit_chapter_selection(pool, all_chapters, manga_id, &default_title, &default_author).await?;
 
             // redirect to book configuration page
             return Ok(PostChapterResponse::RedirectResponse(Redirect::to(
@@ -293,13 +316,13 @@ async fn post_chapters_by_manga_id(
 
     let end = new_current_page + limit;
 
-    let (title, chapters) = suwayomi::get_chapters_by_manga_id(params.0).await?;
+    let (title, chapters) = suwayomi::get_chapters_by_manga_id(manga_id).await?;
     // CQ: TODO avoid this copy
     let items = chapters[new_current_page..end].to_vec();
 
     Ok(PostChapterResponse::TemplateResponse(
         ChapterSelectTemplate {
-            manga_id: params.0,
+            manga_id,
             title,
             items,
             limit,
@@ -343,10 +366,12 @@ async fn get_configure_book(
         return acc;
     });
 
+    let default_title = format!("{} ({}-{})", manga.title, min, max);
+
     Ok(ConfigureBookTemplate {
         id: params.0,
-        default_author,
-        default_title: format!("{} ({}-{})", manga.title, min, max),
+        default_author: book.author,
+        default_title: book.title,
     })
 }
 

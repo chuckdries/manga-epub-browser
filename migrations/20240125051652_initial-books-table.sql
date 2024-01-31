@@ -1,10 +1,10 @@
--- Add migration script here
 CREATE TABLE Books(
   id INTEGER PRIMARY KEY,
   manga_id INTEGER,
-  title STRING,
-  author STRING,
-  status STRING
+  title STRING NOT NULL,
+  author STRING NOT NULL,
+  -- 1: draft
+  status INTEGER NOT NULL
 );
 
 CREATE TABLE BookChapters(
