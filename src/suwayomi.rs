@@ -184,7 +184,27 @@ pub async fn download_chapters(ids: HashSet<i64>) -> Result<(), Error> {
     Ok(())
 }
 
-// CQ: TODO
-pub async fn get_chapters_by_ids(ids: HashSet<i64>) -> Result<(), AppError> {
-    Ok(())
+#[derive(GraphQLQuery)]
+#[graphql(
+    schema_path = "graphql/schema.json",
+    query_path = "graphql/queries/ChaptersByIds.graphql",
+    response_derives = "Debug,Clone"
+)]
+pub struct ChaptersByIds;
+
+pub async fn get_chapters_by_ids(ids: &HashSet<i64>) -> Result<Option<chapters_by_ids::ChaptersByIdsChapters>, AppError> {
+    let client = reqwest::Client::new();
+
+    match post_graphql::<ChaptersByIds, _>(
+        &client,
+        join_url(&env::var("SUWAYOMI_URL")?, "/api/graphql")?,
+        // CQ: TODO avoid this copy
+        chapters_by_ids::Variables { ids: Some(ids.clone().into_iter().collect()) },
+    )
+    .await?
+    .data
+    {
+        Some(data) => Ok(Some(data.chapters)),
+        None => Ok(None),
+    }
 }

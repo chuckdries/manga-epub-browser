@@ -24,7 +24,7 @@ use std::{
 // use suwayomi::get_chapters_by_id;
 use dotenv::dotenv;
 use std::env;
-use suwayomi::{get_manga_by_id, specific_manga_by_id};
+use suwayomi::{get_chapters_by_ids, get_manga_by_id, specific_manga_by_id};
 // use tokio::sync::RwLock;
 use handlebars::{handlebars_helper, DirectorySourceOptions, Handlebars};
 use tower_http::services::ServeDir;
@@ -275,14 +275,17 @@ async fn post_chapters_by_manga_id(
                 Some(author) => author,
                 None => "".to_string(),
             };
+
+            let chapters = get_chapters_by_ids(&all_chapters).await?.expect("Couldn't find details on selected chapter");
         
             // TODO get chapterNumbers from chapter ids
-            let (min, max): (i64, i64) = all_chapters.iter().fold((MAX, 0), |acc, x| {
-                if x < &acc.0 {
-                    return (*x, acc.1);
+            let (min, max): (i64, i64) = chapters.nodes.iter().fold((MAX, 0), |acc, chap| {
+                let num: i64 = chap.chapter_number.floor() as i64;
+                if num < acc.0 {
+                    return (num, acc.1);
                 }
-                if x > &acc.1 {
-                    return (acc.0, *x);
+                if num > acc.1 {
+                    return (acc.0, num);
                 }
                 return acc;
             });
