@@ -1,0 +1,44 @@
+{
+  "db_name": "SQLite",
+  "query": "\n    SELECT Books.manga_id, Books.title as \"title?: String\", Books.author as \"author?: String\", Books.status, BookChapters.chapter_id \n    FROM Books \n    LEFT JOIN BookChapters WHERE BookChapters.book_id = Books.id \n    AND Books.id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "manga_id",
+        "ordinal": 0,
+        "type_info": "Int64"
+      },
+      {
+        "name": "title?: String",
+        "ordinal": 1,
+        "type_info": "Null"
+      },
+      {
+        "name": "author?: String",
+        "ordinal": 2,
+        "type_info": "Null"
+      },
+      {
+        "name": "status",
+        "ordinal": 3,
+        "type_info": "Int64"
+      },
+      {
+        "name": "chapter_id",
+        "ordinal": 4,
+        "type_info": "Int64"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      true,
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "a9986fd86c86147fcb30e8fae41c81eea132be0c0880e719d412512fa78fff48"
+}

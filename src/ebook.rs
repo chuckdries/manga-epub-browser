@@ -15,12 +15,13 @@ pub async fn commit_chapter_selection(
 ) -> Result<i64, AppError> {
     let id = sqlx::query!(
         r#"
-        INSERT INTO Books ( manga_id, title, author )
-        VALUES ( ?1, ?2, ?3 )
+        INSERT INTO Books ( manga_id, title, author, status )
+        VALUES ( ?1, ?2, ?3, ?4 )
         "#,
         manga_id,
         default_title,
-        default_author
+        default_author,
+        1
     )
     .execute(&pool)
     .await?
@@ -42,18 +43,36 @@ pub async fn commit_chapter_selection(
     Ok(id)
 }
 
+#[derive(sqlx::FromRow)]
 pub struct Book {
     pub id: i64,
     pub manga_id: i64,
     pub title: String,
     pub author: String,
+    pub status: i64,
+}
+
+pub async fn get_book_by_id(pool: SqlitePool, id: i64) -> Result<Option<Book>, AppError> {
+    let book: Book = sqlx::query_as(
+        r#"
+        SELECT id, manga_id, title, author, status 
+        FROM Books WHERE Books.id = ?"#,
+    )
+    .bind(id)
+    .fetch_one(&pool)
+    .await?;
+    Ok(Some(book))
+}
+
+pub struct BookWithChapters {
+    pub book: Book,
     pub chapters: HashSet<i64>,
 }
 
 pub async fn get_book_with_chapters_by_id(
     pool: SqlitePool,
     id: i64,
-) -> Result<Option<Book>, AppError> {
+) -> Result<Option<BookWithChapters>, AppError> {
     let book_chapters = sqlx::query!(
         r#"
     SELECT Books.manga_id, Books.title as "title?: String", Books.author as "author?: String", Books.status, BookChapters.chapter_id 
@@ -69,23 +88,26 @@ pub async fn get_book_with_chapters_by_id(
         return Ok(None);
     }
     let mut chapters: HashSet<i64> = HashSet::new();
-    let mut manga_id: i64 = 0;
-    let mut title: String = "".to_string();
-    let mut author: String = "".to_string();
+    let mut book: Option<Book> = None;
     book_chapters.iter().for_each(|chapter| {
-        manga_id = chapter.manga_id.expect("Book missing manga_id");
-        title = chapter.title.expect("Book missing title");
-        author = chapter.author.expect("Book missing author");
+        if book.is_none() {
+            if chapter.title.is_some() && chapter.author.is_some() && chapter.manga_id.is_some() {
+                book = Some(Book {
+                    id,
+                    manga_id: chapter.manga_id.unwrap(),
+                    title: chapter.title.to_owned().unwrap(),
+                    author: chapter.author.to_owned().unwrap(),
+                    status: chapter.status.to_owned(),
+                });
+            }
+        }
         chapters.insert(chapter.chapter_id.expect("BookChapter missing chapter_id"));
     });
 
     dbg!(&chapters);
 
-    Ok(Some(Book {
-        id,
-        manga_id,
-        title,
-        author,
+    Ok(Some(BookWithChapters {
+        book: book.expect("Book missing params"),
         chapters,
     }))
 }

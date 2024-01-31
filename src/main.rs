@@ -10,7 +10,7 @@ use axum::{
     Extension, Router,
 };
 use axum_extra::extract::Form;
-use ebook::{commit_chapter_selection, get_book_with_chapters_by_id};
+use ebook::{commit_chapter_selection, get_book_by_id, get_book_with_chapters_by_id};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sqlx::SqlitePool;
@@ -345,28 +345,10 @@ async fn get_configure_book(
     params: Path<i64>,
     Extension(pool): Extension<SqlitePool>,
 ) -> Result<ConfigureBookTemplate, AppError> {
-    let book = match get_book_with_chapters_by_id(pool, params.0).await? {
+    let book = match get_book_by_id(pool, params.0).await? {
         Some(book) => Ok(book),
         None => Err(anyhow!("Book not found")),
     }?;
-    let manga = get_manga_by_id(book.manga_id).await?;
-    let default_author = match manga.author {
-        Some(author) => author,
-        None => "".to_string(),
-    };
-
-    // TODO get chapterNumbers from chapter ids
-    let (min, max): (i64, i64) = book.chapters.into_iter().fold((MAX, 0), |acc, x| {
-        if x < acc.0 {
-            return (x, acc.1);
-        }
-        if x > acc.1 {
-            return (acc.0, x);
-        }
-        return acc;
-    });
-
-    let default_title = format!("{} ({}-{})", manga.title, min, max);
 
     Ok(ConfigureBookTemplate {
         id: params.0,
