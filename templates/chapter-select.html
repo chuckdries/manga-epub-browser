@@ -1,11 +1,12 @@
 <h1>Select chapters from {{ title }}</h1>
-{{offset}}
 
 <form
   class="chapter-select-form"
   action="/manga/{{ manga_id }}/chapters"
   method="post"
 >
+  <button type="submit" name="special_selection" value="all">select all</button>
+
   <!-- Item Selection Checkboxes -->
   <ul>
     {% for item in items %}

@@ -279,8 +279,8 @@ async fn post_chapters_by_manga_id(
             let chapters = get_chapters_by_ids(&all_chapters).await?.expect("Couldn't find details on selected chapter");
         
             // TODO get chapterNumbers from chapter ids
-            let (min, max): (i64, i64) = chapters.nodes.iter().fold((MAX, 0), |acc, chap| {
-                let num: i64 = chap.chapter_number.floor() as i64;
+            let (min, max): (f64, f64) = chapters.nodes.iter().fold((MAX as f64, 0_f64), |acc, chap| {
+                let num: f64 = chap.chapter_number;
                 if num < acc.0 {
                     return (num, acc.1);
                 }
@@ -317,9 +317,14 @@ async fn post_chapters_by_manga_id(
         .await?;
     session.insert(SESSION_OFFSET_KEY, new_current_page).await?;
 
-    let end = new_current_page + limit;
 
     let (title, chapters) = suwayomi::get_chapters_by_manga_id(manga_id).await?;
+
+    let mut end = new_current_page + limit;
+    let total_chapters = chapters.len();
+    if end > total_chapters {
+        end = total_chapters;
+    }
     // CQ: TODO avoid this copy
     let items = chapters[new_current_page..end].to_vec();
 
