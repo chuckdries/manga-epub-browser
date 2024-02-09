@@ -1,0 +1,5 @@
+mutation FetchChapterPages($id: Int!) {
+  fetchChapterPages(input: {chapterId: $id}) {
+    pages
+  }
+}

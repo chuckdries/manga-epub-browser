@@ -186,6 +186,7 @@ struct ChapterSelectTemplate {
 
 #[debug_handler]
 async fn get_chapters_by_manga_id(params: Path<i64>) -> Result<ChapterSelectTemplate, AppError> {
+    // CQ: TODO need to fetch chapters
     let (title, chapters) = suwayomi::get_chapters_by_manga_id(params.0).await?;
     let limit = 20;
     let offset = 0;
@@ -429,7 +430,10 @@ async fn post_configure_book(
         None => Err(anyhow!("Book not found")),
     }?;
     update_book_details(&pool, params.0, &data.title, &data.author).await?;
-    tokio::spawn(async move { download_chapters(book.chapters, book.book.id, &pool).await });
+    tokio::spawn(async move { match download_chapters(book.chapters, book.book.id, &pool).await {
+        Ok(()) => (),
+        Err(e) => println!("{:#?}", e.0)
+    } });
     Ok(Redirect::to(&format!("/")))
 }
 

@@ -1,11 +1,22 @@
+use std::io::{copy, Cursor};
 use std::{collections::HashSet, env};
 
 use anyhow::{anyhow, Error, Result};
+use askama::filters::format;
 use graphql_client::{reqwest::post_graphql, GraphQLQuery};
 use sqlx::SqlitePool;
 use tokio::time::{sleep, Duration};
 
-use crate::{ebook::{update_book_status, BookStatus}, suwayomi::check_on_download_progress::DownloaderState, util::join_url, AppError};
+use futures::future::{err, join_all, ok};
+use futures::prelude::*;
+use regex::Regex;
+
+use crate::{
+    ebook::{update_book_status, BookStatus},
+    suwayomi::check_on_download_progress::DownloaderState,
+    util::join_url,
+    AppError,
+};
 
 #[derive(GraphQLQuery)]
 #[graphql(
@@ -142,7 +153,11 @@ pub struct DownloadChapters;
 )]
 pub struct CheckOnDownloadProgress;
 
-pub async fn download_chapters(ids: HashSet<i64>, book_id: i64, pool: &SqlitePool) -> Result<(), AppError> {
+pub async fn download_chapters(
+    ids: HashSet<i64>,
+    book_id: i64,
+    pool: &SqlitePool,
+) -> Result<(), AppError> {
     let client = reqwest::Client::new();
 
     dbg!(&ids);
@@ -171,6 +186,14 @@ pub async fn download_chapters(ids: HashSet<i64>, book_id: i64, pool: &SqlitePoo
     if chapters_to_download.len() == 0 {
         println!("Skipped downloading - all chapters already downloaded");
         update_book_status(pool, book_id, BookStatus::ASSEMBLING).await?;
+        // assembly procedure
+        join_all(chapters_download_status.iter().map(|chap| {
+            let path_prefix = format!("data{}", chap.url);
+            fetch_chapter(chap.id, path_prefix)
+        }))
+        .await;
+
+        print!("chapters fetched");
         return Ok(());
     }
 
@@ -214,6 +237,57 @@ pub async fn download_chapters(ids: HashSet<i64>, book_id: i64, pool: &SqlitePoo
 
     update_book_status(pool, book_id, BookStatus::ASSEMBLING).await?;
 
+    // assembly procedure
+    join_all(chapters_download_status.iter().map(|chap| {
+        let path_prefix = format!("data{}", chap.url);
+        fetch_chapter(chap.id, path_prefix)
+    }))
+    .await;
+
+    print!("chapters fetched");
+
+    Ok(())
+}
+
+async fn dl_img(url: &str, path_prefix: &str) -> Result<(), AppError> {
+    // let client = reqwest::Client::new();
+    let re = Regex::new(r"/api/v1/manga/\d+/chapter/\d+/page/(\d+)").unwrap();
+    let Some(caps) = re.captures(url) else {
+        return Err(AppError(anyhow!("Couldn't parse image url")));
+    };
+    std::fs::create_dir_all(path_prefix)?;
+    let mut file = std::fs::File::create(format!("{}/{}", path_prefix, &caps[0]))?;
+    let response = reqwest::get(join_url(&env::var("SUWAYOMI_URL")?, url)?)
+        .await
+        .unwrap();
+    let mut content = Cursor::new(response.bytes().await?);
+    copy(&mut content, &mut file)?;
+    Ok(())
+}
+
+#[derive(GraphQLQuery)]
+#[graphql(
+    schema_path = "graphql/schema.json",
+    query_path = "graphql/queries/FetchChapterPages.graphql",
+    response_derives = "Debug,Clone"
+)]
+pub struct FetchChapterPages;
+pub async fn fetch_chapter(chapter: i64, path_prefix: String) -> Result<(), AppError> {
+    let client = reqwest::Client::new();
+
+    let urls = match post_graphql::<FetchChapterPages, _>(
+        &client,
+        join_url(&env::var("SUWAYOMI_URL")?, "/api/graphql")?,
+        fetch_chapter_pages::Variables { id: chapter },
+    )
+    .await?
+    .data
+    {
+        Some(data) => data.fetch_chapter_pages.pages,
+        None => vec![],
+    };
+
+    join_all(urls.iter().map(|img| dl_img(img, &path_prefix))).await;
     Ok(())
 }
 
