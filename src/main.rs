@@ -1,30 +1,50 @@
 extern crate dotenv;
-use anyhow::{anyhow, Error, Result};
+use anyhow::{
+    anyhow,
+    // Error,
+    Result,
+};
 use askama::Template;
 use axum::{
     debug_handler,
-    extract::{Path, Query, State},
+    extract::{
+        Path,
+        Query,
+        // State
+    },
     http::StatusCode,
     response::{Html, IntoResponse, Redirect, Response},
     routing::{get, post},
     Extension, Router,
 };
 use axum_extra::extract::Form;
-use ebook::{commit_chapter_selection, get_book_by_id, get_book_with_chapters_by_id};
+use ebook::{
+    commit_chapter_selection,
+    get_book_by_id,
+    // get_book_with_chapters_by_id
+};
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{
+    // json,
+    Value,
+};
 use sqlx::SqlitePool;
 use std::{
     collections::{HashMap, HashSet},
     i64::MAX,
-    net::SocketAddr,
+    // net::SocketAddr,
     sync::Arc,
 };
 // use suwayomi::download_chapters;
 // use suwayomi::get_chapters_by_id;
 use dotenv::dotenv;
 use std::env;
-use suwayomi::{get_chapters_by_ids, get_manga_by_id, specific_manga_by_id};
+use suwayomi::{
+    get_all_sources_by_lang,
+    get_chapters_by_ids,
+    get_manga_by_id,
+    // specific_manga_by_id,
+};
 // use tokio::sync::RwLock;
 use handlebars::{handlebars_helper, DirectorySourceOptions, Handlebars};
 use tower_http::services::ServeDir;
@@ -35,7 +55,8 @@ mod suwayomi;
 mod util; // Declare the util module
 
 extern crate pretty_env_logger;
-#[macro_use] extern crate log;
+// #[macro_use]
+extern crate log;
 
 // struct AppState {
 //     config: RwLock<AppConfig>, // Use RwLock for thread-safe access
@@ -105,6 +126,10 @@ async fn search_results(
     handlebars: Extension<Arc<Handlebars<'static>>>,
 ) -> AppResponse {
     let title = params.get("title").unwrap().to_string();
+    let sources = get_all_sources_by_lang(suwayomi::all_sources_by_language::Variables {
+        lang: "en".to_string()
+    }).await.expect("configure sources and language before using search");
+    // todo: search through all sources
     let res = suwayomi::search_manga_by_title(suwayomi::manga_source_search::Variables {
         input: suwayomi::manga_source_search::FetchSourceMangaInput {
             type_: suwayomi::manga_source_search::FetchSourceMangaType::SEARCH,
@@ -112,8 +137,8 @@ async fn search_results(
             query: Some(title.clone()),
             filters: Box::new(None),
             page: 1,
-            source: "2499283573021220255".to_string()
-        }
+            source: sources.first().expect("no sources").id.clone(),
+        },
     })
     .await?;
 
@@ -283,23 +308,36 @@ async fn post_chapters_by_manga_id(
                 None => "".to_string(),
             };
 
-            let chapters = get_chapters_by_ids(&all_chapters).await?.expect("Couldn't find details on selected chapter");
-        
+            let chapters = get_chapters_by_ids(&all_chapters)
+                .await?
+                .expect("Couldn't find details on selected chapter");
+
             // TODO get chapterNumbers from chapter ids
-            let (min, max): (f64, f64) = chapters.nodes.iter().fold((MAX as f64, 0_f64), |acc, chap| {
-                let num: f64 = chap.chapter_number;
-                if num < acc.0 {
-                    return (num, acc.1);
-                }
-                if num > acc.1 {
-                    return (acc.0, num);
-                }
-                return acc;
-            });
-        
+            let (min, max): (f64, f64) =
+                chapters
+                    .nodes
+                    .iter()
+                    .fold((MAX as f64, 0_f64), |acc, chap| {
+                        let num: f64 = chap.chapter_number;
+                        if num < acc.0 {
+                            return (num, acc.1);
+                        }
+                        if num > acc.1 {
+                            return (acc.0, num);
+                        }
+                        return acc;
+                    });
+
             let default_title = format!("{} ({}-{})", manga.title, min, max);
 
-            let book_id = commit_chapter_selection(pool, all_chapters, manga_id, &default_title, &default_author).await?;
+            let book_id = commit_chapter_selection(
+                pool,
+                all_chapters,
+                manga_id,
+                &default_title,
+                &default_author,
+            )
+            .await?;
 
             // redirect to book configuration page
             return Ok(PostChapterResponse::RedirectResponse(Redirect::to(
@@ -323,7 +361,6 @@ async fn post_chapters_by_manga_id(
         )
         .await?;
     session.insert(SESSION_OFFSET_KEY, new_current_page).await?;
-
 
     let (title, chapters) = suwayomi::get_chapters_by_manga_id(manga_id).await?;
 
@@ -372,13 +409,19 @@ async fn get_configure_book(
     })
 }
 
-#[derive(Template)]
-#[template(path = "home.html")]
-struct HomeTemplate {}
+// #[template(path = "home.html")]
+#[derive(Serialize)]
+struct HomeTemplate {
+    sources: Vec<suwayomi::all_sources_by_language::AllSourcesByLanguageSourcesNodes>,
+}
 
 #[debug_handler]
 async fn home(handlebars: Extension<Arc<Handlebars<'static>>>) -> Result<Html<String>, AppError> {
-    match handlebars.render("home", &()) {
+    let sources = get_all_sources_by_lang(suwayomi::all_sources_by_language::Variables {
+        lang: "en".to_string(),
+    })
+    .await?;
+    match handlebars.render("home", &HomeTemplate { sources }) {
         Ok(rendered) => Ok(Html(rendered)),
         Err(msg) => Err(AppError(anyhow!(msg))),
     }
@@ -409,7 +452,7 @@ async fn main() {
 
     let mut handlebars = Handlebars::new();
     handlebars.set_dev_mode(true);
-    
+
     handlebars_helper!(json: |v: Value| v.to_string());
     handlebars.register_helper("json", Box::new(json));
 
@@ -428,7 +471,6 @@ async fn main() {
     // handlebars.register_script_helper_file(name, script_path)
 
     let handlebars = Arc::new(handlebars);
-
 
     // build our application with a single route
     let app = Router::new()

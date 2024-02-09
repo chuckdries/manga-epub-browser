@@ -9,10 +9,28 @@ use crate::{suwayomi::check_on_download_progress::DownloaderState, util::join_ur
 #[derive(GraphQLQuery)]
 #[graphql(
     schema_path = "graphql/schema.json",
-    query_path = "graphql/queries/MangaSearchByTitle.graphql",
+    query_path = "graphql/queries/AllSourcesByLanguage.graphql",
     response_derives = "Debug,Serialize"
 )]
-pub struct MangaSearchByTitle;
+pub struct AllSourcesByLanguage;
+
+pub async fn get_all_sources_by_lang(
+    variables: all_sources_by_language::Variables,
+) -> Result<Vec<all_sources_by_language::AllSourcesByLanguageSourcesNodes>, Error> {
+    let client = reqwest::Client::new();
+
+    return match post_graphql::<AllSourcesByLanguage, _>(
+        &client,
+        join_url(&env::var("SUWAYOMI_URL")?, "/api/graphql")?,
+        variables,
+    )
+    .await?
+    .data
+    {
+        Some(data) => Ok(data.sources.nodes),
+        None => Ok(Vec::new()),
+    };
+}
 
 type LongString = String;
 #[derive(GraphQLQuery)]
@@ -201,13 +219,17 @@ pub async fn download_chapters(ids: HashSet<i64>) -> Result<(), Error> {
 )]
 pub struct ChaptersByIds;
 
-pub async fn get_chapters_by_ids(ids: &HashSet<i64>) -> Result<Option<chapters_by_ids::ChaptersByIdsChapters>, AppError> {
+pub async fn get_chapters_by_ids(
+    ids: &HashSet<i64>,
+) -> Result<Option<chapters_by_ids::ChaptersByIdsChapters>, AppError> {
     let client = reqwest::Client::new();
 
     match post_graphql::<ChaptersByIds, _>(
         &client,
         join_url(&env::var("SUWAYOMI_URL")?, "/api/graphql")?,
-        chapters_by_ids::Variables { ids: Some(ids.into_iter().cloned().collect()) },
+        chapters_by_ids::Variables {
+            ids: Some(ids.into_iter().cloned().collect()),
+        },
     )
     .await?
     .data

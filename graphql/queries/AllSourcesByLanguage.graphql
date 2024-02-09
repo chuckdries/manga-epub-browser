@@ -1,0 +1,9 @@
+query AllSourcesByLanguage($lang: String!) {
+  sources(filter: {lang: {equalTo: $lang}}) {
+    nodes {
+      id
+      name
+      lang
+    }
+  }
+}
