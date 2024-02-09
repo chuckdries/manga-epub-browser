@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\n    SELECT Books.manga_id, Books.title as \"title?: String\", Books.author as \"author?: String\", Books.status, BookChapters.chapter_id \n    FROM Books \n    LEFT JOIN BookChapters WHERE BookChapters.book_id = Books.id \n    AND Books.id = ?",
+  "query": "\n    SELECT Books.manga_id, Books.title, Books.author, Books.status, BookChapters.chapter_id \n    FROM Books \n    LEFT JOIN BookChapters WHERE BookChapters.book_id = Books.id \n    AND Books.id = ?",
   "describe": {
     "columns": [
       {
@@ -9,14 +9,14 @@
         "type_info": "Int64"
       },
       {
-        "name": "title?: String",
+        "name": "title",
         "ordinal": 1,
-        "type_info": "Null"
+        "type_info": "Text"
       },
       {
-        "name": "author?: String",
+        "name": "author",
         "ordinal": 2,
-        "type_info": "Null"
+        "type_info": "Text"
       },
       {
         "name": "status",
@@ -33,12 +33,12 @@
       "Right": 1
     },
     "nullable": [
-      true,
+      false,
       false,
       false,
       false,
       true
     ]
   },
-  "hash": "a9986fd86c86147fcb30e8fae41c81eea132be0c0880e719d412512fa78fff48"
+  "hash": "05e60afb1104e845bbe8eb4d21edfdc013ad69b09f991f026434cf4b82c58e9e"
 }

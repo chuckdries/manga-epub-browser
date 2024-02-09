@@ -2,9 +2,10 @@ use std::{collections::HashSet, env};
 
 use anyhow::{anyhow, Error, Result};
 use graphql_client::{reqwest::post_graphql, GraphQLQuery};
+use sqlx::SqlitePool;
 use tokio::time::{sleep, Duration};
 
-use crate::{suwayomi::check_on_download_progress::DownloaderState, util::join_url, AppError};
+use crate::{ebook::{update_book_status, BookStatus}, suwayomi::check_on_download_progress::DownloaderState, util::join_url, AppError};
 
 #[derive(GraphQLQuery)]
 #[graphql(
@@ -141,7 +142,7 @@ pub struct DownloadChapters;
 )]
 pub struct CheckOnDownloadProgress;
 
-pub async fn download_chapters(ids: HashSet<i64>) -> Result<(), Error> {
+pub async fn download_chapters(ids: HashSet<i64>, book_id: i64, pool: &SqlitePool) -> Result<(), AppError> {
     let client = reqwest::Client::new();
 
     dbg!(&ids);
@@ -169,8 +170,11 @@ pub async fn download_chapters(ids: HashSet<i64>) -> Result<(), Error> {
 
     if chapters_to_download.len() == 0 {
         println!("Skipped downloading - all chapters already downloaded");
+        update_book_status(pool, book_id, BookStatus::ASSEMBLING).await?;
         return Ok(());
     }
+
+    update_book_status(pool, book_id, BookStatus::DOWNLOADING).await?;
 
     let res = post_graphql::<DownloadChapters, _>(
         &client,
@@ -192,13 +196,13 @@ pub async fn download_chapters(ids: HashSet<i64>) -> Result<(), Error> {
         .await?
         .data
         {
-            Some(data) => Ok(data.download_status.state),
+            Some(data) => Ok(data),
             None => Err(anyhow!("Missing response data")),
         }?;
 
         dbg!(&downloader_state);
 
-        if downloader_state == DownloaderState::STOPPED {
+        if downloader_state.download_status.state == DownloaderState::STOPPED {
             break;
         }
 
@@ -207,6 +211,8 @@ pub async fn download_chapters(ids: HashSet<i64>) -> Result<(), Error> {
     }
 
     println!("download complete");
+
+    update_book_status(pool, book_id, BookStatus::ASSEMBLING).await?;
 
     Ok(())
 }

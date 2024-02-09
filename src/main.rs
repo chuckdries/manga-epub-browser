@@ -19,9 +19,8 @@ use axum::{
 };
 use axum_extra::extract::Form;
 use ebook::{
-    commit_chapter_selection,
-    get_book_by_id,
-    // get_book_with_chapters_by_id
+    commit_chapter_selection, get_book_by_id, get_book_table, get_book_with_chapters_by_id,
+    update_book_details, BookStatus, SqlBook,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{
@@ -40,10 +39,10 @@ use std::{
 use dotenv::dotenv;
 use std::env;
 use suwayomi::{
+    download_chapters,
     get_all_sources_by_lang,
     get_chapters_by_ids,
-    get_manga_by_id,
-    // specific_manga_by_id,
+    get_manga_by_id, // specific_manga_by_id,
 };
 // use tokio::sync::RwLock;
 use handlebars::{handlebars_helper, DirectorySourceOptions, Handlebars};
@@ -127,8 +126,10 @@ async fn search_results(
 ) -> AppResponse {
     let title = params.get("title").unwrap().to_string();
     let sources = get_all_sources_by_lang(suwayomi::all_sources_by_language::Variables {
-        lang: "en".to_string()
-    }).await.expect("configure sources and language before using search");
+        lang: "en".to_string(),
+    })
+    .await
+    .expect("configure sources and language before using search");
     // todo: search through all sources
     let res = suwayomi::search_manga_by_title(suwayomi::manga_source_search::Variables {
         input: suwayomi::manga_source_search::FetchSourceMangaInput {
@@ -312,23 +313,25 @@ async fn post_chapters_by_manga_id(
                 .await?
                 .expect("Couldn't find details on selected chapter");
 
-            // TODO get chapterNumbers from chapter ids
-            let (min, max): (f64, f64) =
-                chapters
-                    .nodes
-                    .iter()
-                    .fold((MAX as f64, 0_f64), |acc, chap| {
-                        let num: f64 = chap.chapter_number;
-                        if num < acc.0 {
-                            return (num, acc.1);
-                        }
-                        if num > acc.1 {
-                            return (acc.0, num);
-                        }
-                        return acc;
-                    });
-
-            let default_title = format!("{} ({}-{})", manga.title, min, max);
+            let default_title = if chapters.nodes.len() == 1 {
+                format!("{} ({})", manga.title, chapters.nodes[0].chapter_number)
+            } else {
+                let (min, max): (f64, f64) =
+                    chapters
+                        .nodes
+                        .iter()
+                        .fold((MAX as f64, 0_f64), |acc, chap| {
+                            let num: f64 = chap.chapter_number;
+                            if num < acc.0 {
+                                return (num, acc.1);
+                            }
+                            if num > acc.1 {
+                                return (acc.0, num);
+                            }
+                            return acc;
+                        });
+                format!("{} ({}-{})", manga.title, min, max)
+            };
 
             let book_id = commit_chapter_selection(
                 pool,
@@ -409,19 +412,45 @@ async fn get_configure_book(
     })
 }
 
+#[derive(Deserialize)]
+struct ConfigureBookInput {
+    title: String,
+    author: String,
+}
+
+#[debug_handler]
+async fn post_configure_book(
+    params: Path<i64>,
+    Extension(pool): Extension<SqlitePool>,
+    Form(data): Form<ConfigureBookInput>,
+) -> Result<impl IntoResponse, AppError> {
+    let book = match get_book_with_chapters_by_id(&pool, params.0).await? {
+        Some(book) => Ok(book),
+        None => Err(anyhow!("Book not found")),
+    }?;
+    update_book_details(&pool, params.0, &data.title, &data.author).await?;
+    tokio::spawn(async move { download_chapters(book.chapters, book.book.id, &pool).await });
+    Ok(Redirect::to(&format!("/")))
+}
+
 // #[template(path = "home.html")]
 #[derive(Serialize)]
 struct HomeTemplate {
     sources: Vec<suwayomi::all_sources_by_language::AllSourcesByLanguageSourcesNodes>,
+    books: Vec<SqlBook>,
 }
 
 #[debug_handler]
-async fn home(handlebars: Extension<Arc<Handlebars<'static>>>) -> Result<Html<String>, AppError> {
+async fn home(
+    handlebars: Extension<Arc<Handlebars<'static>>>,
+    Extension(pool): Extension<SqlitePool>,
+) -> Result<Html<String>, AppError> {
     let sources = get_all_sources_by_lang(suwayomi::all_sources_by_language::Variables {
         lang: "en".to_string(),
     })
     .await?;
-    match handlebars.render("home", &HomeTemplate { sources }) {
+    let books = get_book_table(&pool).await?;
+    match handlebars.render("home", &HomeTemplate { sources, books }) {
         Ok(rendered) => Ok(Html(rendered)),
         Err(msg) => Err(AppError(anyhow!(msg))),
     }
@@ -456,6 +485,15 @@ async fn main() {
     handlebars_helper!(json: |v: Value| v.to_string());
     handlebars.register_helper("json", Box::new(json));
 
+    handlebars_helper!(bookStatus: |v: u8| match v {
+        1 => "Draft",
+        2 => "Downloading",
+        3 => "Assembling",
+        4 => "Done",
+        _ => "Errored"
+    });
+    handlebars.register_helper("bookStatus", Box::new(bookStatus));
+
     match handlebars.register_templates_directory(
         "templates",
         DirectorySourceOptions {
@@ -480,6 +518,7 @@ async fn main() {
         .route("/manga/:id/chapters", get(get_chapters_by_manga_id))
         .route("/manga/:id/chapters", post(post_chapters_by_manga_id))
         .route("/configure-book/:id", get(get_configure_book))
+        .route("/configure-book/:id", post(post_configure_book))
         .nest_service("/public", ServeDir::new("public"))
         .fallback(not_found)
         .layer(Extension(pool))

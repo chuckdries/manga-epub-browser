@@ -3,7 +3,7 @@ CREATE TABLE Books(
   manga_id INTEGER NOT NULL,
   title TEXT NOT NULL,
   author TEXT NOT NULL,
-  -- 1: draft
+  -- 1: draft, 2: downloading, 3: assembling, 4: done, 5: encountered error
   status INTEGER NOT NULL
 );
 

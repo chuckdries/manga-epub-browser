@@ -2,6 +2,7 @@ use std::collections::HashSet;
 
 use anyhow::anyhow;
 use askama::Result;
+use serde::Serialize;
 use sqlx::{Acquire, SqlitePool};
 
 use crate::AppError;
@@ -43,8 +44,8 @@ pub async fn commit_chapter_selection(
     Ok(id)
 }
 
-#[derive(sqlx::FromRow)]
-pub struct Book {
+#[derive(sqlx::FromRow, Serialize)]
+pub struct SqlBook {
     pub id: i64,
     pub manga_id: i64,
     pub title: String,
@@ -52,11 +53,51 @@ pub struct Book {
     pub status: i64,
 }
 
+pub struct Book {
+    pub id: i64,
+    pub manga_id: i64,
+    pub title: String,
+    pub author: String,
+    pub status: BookStatus,
+}
+
 pub async fn get_book_by_id(pool: SqlitePool, id: i64) -> Result<Option<Book>, AppError> {
-    let book = sqlx::query_as!(Book, r#" SELECT * FROM Books WHERE Books.id = ?"#, id)
+    let book = sqlx::query_as!(SqlBook, r#" SELECT * FROM Books WHERE Books.id = ?"#, id)
         .fetch_one(&pool)
         .await?;
-    Ok(Some(book))
+    Ok(Some(Book {
+        id: book.id,
+        manga_id: book.manga_id,
+        title: book.title,
+        author: book.author,
+        status: match book.status {
+            1 => BookStatus::DRAFT,
+            2 => BookStatus::DOWNLOADING,
+            3 => BookStatus::ASSEMBLING,
+            4 => BookStatus::DONE,
+            _ => BookStatus::ERROR,
+        },
+    }))
+}
+
+pub async fn get_book_table(pool: &SqlitePool) -> Result<Vec<SqlBook>, AppError> {
+    let books = sqlx::query_as!(SqlBook, r#" SELECT * FROM Books"#)
+        // .map(|b| Book {
+        //     id: b.id,
+        //     manga_id: b.manga_id,
+        //     title: b.title,
+        //     author: b.author,
+        //     status: match b.status {
+        //         1 => BookStatus::DRAFT,
+        //         2 => BookStatus::DOWNLOADING,
+        //         3 => BookStatus::ASSEMBLING,
+        //         4 => BookStatus::DONE,
+        //         _ => BookStatus::ERROR,
+        //     },
+        // })
+        .fetch_all(pool)
+        .await?;
+    Ok(books)
 }
 
 pub struct BookWithChapters {
@@ -65,7 +106,7 @@ pub struct BookWithChapters {
 }
 
 pub async fn get_book_with_chapters_by_id(
-    pool: SqlitePool,
+    pool: &SqlitePool,
     id: i64,
 ) -> Result<Option<BookWithChapters>, AppError> {
     let book_chapters = sqlx::query!(
@@ -76,7 +117,7 @@ pub async fn get_book_with_chapters_by_id(
     AND Books.id = ?"#,
         id
     )
-    .fetch_all(&pool)
+    .fetch_all(pool)
     .await?;
 
     if book_chapters.len() == 0 {
@@ -91,7 +132,13 @@ pub async fn get_book_with_chapters_by_id(
                 manga_id: chapter.manga_id,
                 title: chapter.title.to_owned(),
                 author: chapter.author.to_owned(),
-                status: chapter.status.to_owned(),
+                status: match chapter.status {
+                    1 => BookStatus::DRAFT,
+                    2 => BookStatus::DOWNLOADING,
+                    3 => BookStatus::ASSEMBLING,
+                    4 => BookStatus::DONE,
+                    _ => BookStatus::ERROR,
+                },
             });
         }
         chapters.insert(chapter.chapter_id.expect("BookChapter missing chapter_id"));
@@ -103,4 +150,60 @@ pub async fn get_book_with_chapters_by_id(
         book: book.expect("Book missing params"),
         chapters,
     }))
+}
+
+pub enum BookStatus {
+    DRAFT = 1,
+    DOWNLOADING = 2,
+    ASSEMBLING = 3,
+    DONE = 4,
+    ERROR = 5,
+}
+
+pub async fn update_book_status(
+    pool: &SqlitePool,
+    id: i64,
+    _status: BookStatus,
+) -> Result<(), AppError> {
+    // let status = match _status {
+    //     BookStatus::DRAFT => 1,
+    //     BookStatus::DOWNLOADING => 2,
+    //     BookStatus::ASSEMBLING => 3,
+    //     BookStatus::DONE => 4,
+    //     BookStatus::ERROR => 5,
+    // };
+    let status = _status as u8;
+    sqlx::query!(
+        r#"
+        UPDATE Books
+        SET status = ?
+        WHERE id = ?
+        "#,
+        status,
+        id
+    )
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+pub async fn update_book_details(
+    pool: &SqlitePool,
+    id: i64,
+    title: &str,
+    author: &str,
+) -> Result<(), AppError> {
+    sqlx::query!(
+        r#"
+        UPDATE Books
+        SET title = ?, author = ?
+        WHERE id = ?
+        "#,
+        title,
+        author,
+        id
+    )
+    .execute(pool)
+    .await?;
+    Ok(())
 }
