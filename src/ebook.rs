@@ -1,6 +1,5 @@
 use std::collections::HashSet;
 
-use anyhow::anyhow;
 use askama::Result;
 use serde::Serialize;
 use sqlx::{Acquire, SqlitePool};

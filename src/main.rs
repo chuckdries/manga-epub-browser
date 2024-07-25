@@ -4,7 +4,7 @@ use anyhow::{
     // Error,
     Result,
 };
-use askama::Template;
+use askama::{Template, DynTemplate};
 use axum::{
     debug_handler,
     extract::{
@@ -19,8 +19,7 @@ use axum::{
 };
 use axum_extra::extract::Form;
 use ebook::{
-    commit_chapter_selection, get_book_by_id, get_book_table, get_book_with_chapters_by_id,
-    update_book_details, BookStatus, SqlBook,
+    commit_chapter_selection, get_book_by_id, get_book_with_chapters_by_id, update_book_details,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{
@@ -42,6 +41,7 @@ use suwayomi::{
     download_chapters,
     get_all_sources_by_lang,
     get_chapters_by_ids,
+    get_library,
     get_manga_by_id, // specific_manga_by_id,
 };
 // use tokio::sync::RwLock;
@@ -52,6 +52,7 @@ use tower_sessions::{cookie::time::Duration, Expiry, MemoryStore, Session, Sessi
 mod ebook;
 mod suwayomi;
 mod util; // Declare the util module
+mod filters;
 
 extern crate pretty_env_logger;
 // #[macro_use]
@@ -84,6 +85,7 @@ struct ErrorPageTemplate {
 // Tell axum how to convert `AppError` into a response.
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
+        log::error!("{:?}", self.0);
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             ErrorPageTemplate {
@@ -106,7 +108,7 @@ where
     }
 }
 
-async fn not_found() -> Html<&'static str> {
+async fn not_found() -> impl IntoResponse {
     Html("<h1>404 Not found</h1><a href=\"/\">Back home</a>")
 }
 
@@ -125,11 +127,11 @@ async fn search_results(
     handlebars: Extension<Arc<Handlebars<'static>>>,
 ) -> AppResponse {
     let title = params.get("title").unwrap().to_string();
-    let sources = get_all_sources_by_lang(suwayomi::all_sources_by_language::Variables {
-        lang: "en".to_string(),
-    })
-    .await
-    .expect("configure sources and language before using search");
+    let source = params.get("source").unwrap().to_string();
+    let page = match params.get("page") {
+        Some(page) => page.parse::<i64>().unwrap(),
+        None => 1,
+    };
     // todo: search through all sources
     let res = suwayomi::search_manga_by_title(suwayomi::manga_source_search::Variables {
         input: suwayomi::manga_source_search::FetchSourceMangaInput {
@@ -137,8 +139,8 @@ async fn search_results(
             client_mutation_id: None,
             query: Some(title.clone()),
             filters: Box::new(None),
-            page: 1,
-            source: sources.first().expect("no sources").id.clone(),
+            page,
+            source,
         },
     })
     .await?;
@@ -430,34 +432,41 @@ async fn post_configure_book(
         None => Err(anyhow!("Book not found")),
     }?;
     update_book_details(&pool, params.0, &data.title, &data.author).await?;
-    tokio::spawn(async move { match download_chapters(book.chapters, book.book.id, &pool).await {
-        Ok(()) => (),
-        Err(e) => println!("{:#?}", e.0)
-    } });
+    tokio::spawn(async move {
+        match download_chapters(book.chapters, book.book.id, &pool).await {
+            Ok(()) => (),
+            Err(e) => println!("{:#?}", e.0),
+        }
+    });
     Ok(Redirect::to(&format!("/")))
 }
 
-// #[template(path = "home.html")]
-#[derive(Serialize)]
+#[derive(Template)]
+#[template(path = "home.html", print = "code")]
 struct HomeTemplate {
     sources: Vec<suwayomi::all_sources_by_language::AllSourcesByLanguageSourcesNodes>,
-    books: Vec<SqlBook>,
+    library: Vec<suwayomi::get_library::GetLibraryMangasNodes>,
+    // books: Vec<SqlBook>,
 }
-
+// Extension(pool): Extension<SqlitePool>
 #[debug_handler]
-async fn home(
-    handlebars: Extension<Arc<Handlebars<'static>>>,
-    Extension(pool): Extension<SqlitePool>,
-) -> Result<Html<String>, AppError> {
+async fn home() -> Result<HomeTemplate, AppError> {
     let sources = get_all_sources_by_lang(suwayomi::all_sources_by_language::Variables {
         lang: "en".to_string(),
     })
-    .await?;
-    let books = get_book_table(&pool).await?;
-    match handlebars.render("home", &HomeTemplate { sources, books }) {
-        Ok(rendered) => Ok(Html(rendered)),
-        Err(msg) => Err(AppError(anyhow!(msg))),
-    }
+    .await
+    .expect("configure sources and language before using search");
+
+    let library = get_library().await?;
+    // let books = get_book_table(&pool).await?;
+    Ok(HomeTemplate {
+        sources,
+        library,
+    })
+    // match handlebars.render("home", &HomeTemplate { sources, books }) {
+    //     Ok(rendered) => Ok(Html(rendered)),
+    //     Err(msg) => Err(AppError(anyhow!(msg))),
+    // }
 }
 
 #[tokio::main]

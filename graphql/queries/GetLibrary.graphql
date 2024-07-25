@@ -1,0 +1,15 @@
+query GetLibrary {
+  mangas(condition: { inLibrary: true }) {
+    nodes {
+      ...MangaNodeThumbInfo
+    }
+  }
+}
+
+fragment MangaNodeThumbInfo on MangaType {
+  id
+  title
+  thumbnailUrl
+  author
+  genre
+}

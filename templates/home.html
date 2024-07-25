@@ -1,5 +1,69 @@
-<h1>Search for a manga by title</h1>
-<form method="get" action="/search">
-  <input type="text" name="title" />
-  <button type="submit">Search</button>
-</form>
+{% extends "base.html" %} {% block title %}Home{% endblock %}
+<!-- asdf -->
+{% block content %} {# TODO: settings such as suwayomi URL here? #}
+
+<div class="section">
+  <form class="block" method="get" action="/search">
+    <h2 class="title is-2">Search for a manga by title</h2>
+    <div class="field">
+      <label class="label">Source</label>
+      <div class="control">
+        <div class="select">
+          <select name="source">
+            {% for source in sources %}
+            <option value="{{source.id}}">{{source.name}}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="field">
+      <label class="label">Manga Name</label>
+      <div class="control">
+        <input class="input" type="text" name="title" />
+      </div>
+    </div>
+    <div class="field is-grouped">
+      <div class="control">
+        <button type="submit" class="button is-link">Search</button>
+      </div>
+    </div>
+  </form>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+</div>
+
+<div class="section">
+  <h2 class="title is-2">Your library</h2>
+  <div class="grid">
+    {% for manga in library%}
+    <div class="cell card">
+      {% if let Some(thumbnail_url) = manga.thumbnail_url %}
+        {% if let Some(full_thumb_url) = self::util::get_suwayomi_url(thumbnail_url)%}
+        <div class="card-image">
+          <figure class="image">
+            <img
+              src="{{ full_thumb_url }}"
+              alt="Cover image for {{manga.title}}"
+            />
+          </figure>
+        </div>
+        {% endif %}
+        <div class="card-content">
+          <div class="media">
+            <div class="media-content">
+              <p class="title is-4">{{ manga.title }}</p>
+              {% if let Some(author) = manga.author%}
+              <p class="subtitle is-6">{{ author }}</p>
+              {% endif %}
+            </div>
+          </div>
+          {# <div class="content">
+            {{ manga.genre.join(", ") }}
+          </div> #}
+        </div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

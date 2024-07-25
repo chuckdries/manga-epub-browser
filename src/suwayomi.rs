@@ -2,12 +2,11 @@ use std::io::{copy, Cursor};
 use std::{collections::HashSet, env};
 
 use anyhow::{anyhow, Error, Result};
-use askama::filters::format;
 use graphql_client::{reqwest::post_graphql, GraphQLQuery};
 use sqlx::SqlitePool;
 use tokio::time::{sleep, Duration};
 
-use futures::future::{err, join_all, ok};
+use futures::future::{join_all};
 use futures::prelude::*;
 use regex::Regex;
 
@@ -17,6 +16,30 @@ use crate::{
     util::join_url,
     AppError,
 };
+
+#[derive(GraphQLQuery)]
+#[graphql(
+    schema_path = "graphql/schema.json",
+    query_path = "graphql/queries/GetLibrary.graphql",
+    response_derives = "Debug,Serialize"
+)]
+pub struct GetLibrary;
+
+pub async fn get_library() -> Result<Vec<get_library::GetLibraryMangasNodes>, Error> {
+    let client = reqwest::Client::new();
+
+    return match post_graphql::<GetLibrary, _>(
+        &client,
+        join_url(&env::var("SUWAYOMI_URL")?, "/api/graphql")?,
+        get_library::Variables {},
+    )
+    .await?
+    .data
+    {
+        Some(data) => Ok(data.mangas.nodes),
+        None => Ok(Vec::new()),
+    };
+}
 
 #[derive(GraphQLQuery)]
 #[graphql(
