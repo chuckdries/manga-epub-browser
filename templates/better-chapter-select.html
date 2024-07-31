@@ -1,0 +1,50 @@
+{% extends "base.html" %} {% block head %}
+<link rel="stylesheet" href="/public/better-chapter-select.css" />
+{% endblock %} {% block content %}
+<form class="p-0" action="/book/new/select-chapters" method="post">
+  <input type="hidden" name="manga_id" value="{{ manga_id }}">
+  <div
+    class="control-bar has-background-light is-flex is-justify-content-space-between is-align-items-center"
+  >
+    <div>
+      <h1 class="title is-4 *-0">Select chapters to include in the epub</h1>
+      <p class="subtitle *-0">
+        Click and drag to select multiple chapters quickly
+      </p>
+    </div>
+    <div>
+      <button class="button is-link" type="submit">Next</button>
+    </div>
+  </div>
+  <table class="table is-fullwidth">
+    <thead>
+      <tr>
+        <th></th>
+        <th>Chapter</th>
+        <th>Scanlator</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for chapter in chapters %}
+      <tr
+        id="chapter-{{chapter.chapter_number}}"
+        _="on mousedown or mouseenter [buttons==1] toggle @checked on <input/> in me"
+      >
+        <td>
+          <div class="fake-check"></div>
+          <input
+            style="visibility: hidden"
+            type="checkbox"
+            name="chapter_id"
+            value="{{ chapter.id }}"
+            alt="inlcude chapter {{chapter.name}} in book"
+          />
+        </td>
+        <td>{{ chapter.name }}</td>
+        <td>{% if let Some(scanlator) = chapter.scanlator %}{{ scanlator }}{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</form>
+{% endblock %}

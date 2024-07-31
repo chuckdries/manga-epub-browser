@@ -52,7 +52,7 @@ use tower_sessions::{cookie::time::Duration, Expiry, MemoryStore, Session, Sessi
 mod ebook;
 mod suwayomi;
 mod util; // Declare the util module
-mod filters;
+mod views;
 
 extern crate pretty_env_logger;
 // #[macro_use]
@@ -189,14 +189,14 @@ struct ChapterSelectTemplate {
 #[debug_handler]
 async fn get_chapters_by_manga_id(params: Path<i64>) -> Result<ChapterSelectTemplate, AppError> {
     // CQ: TODO need to fetch chapters
-    let (title, chapters) = suwayomi::get_chapters_by_manga_id(params.0).await?;
+    let chapters = suwayomi::get_chapters_by_manga_id(params.0).await?;
     let limit = 20;
     let offset = 0;
     // CQ: TODO avoid this copy
     let items = chapters[offset..limit].to_vec();
     Ok(ChapterSelectTemplate {
         manga_id: params.0,
-        title,
+        title: "".to_string(),
         items,
         limit,
         offset,
@@ -368,7 +368,7 @@ async fn post_chapters_by_manga_id(
         .await?;
     session.insert(SESSION_OFFSET_KEY, new_current_page).await?;
 
-    let (title, chapters) = suwayomi::get_chapters_by_manga_id(manga_id).await?;
+    let chapters = suwayomi::get_chapters_by_manga_id(manga_id).await?;
 
     let mut end = new_current_page + limit;
     let total_chapters = chapters.len();
@@ -381,7 +381,7 @@ async fn post_chapters_by_manga_id(
     Ok(PostChapterResponse::TemplateResponse(
         ChapterSelectTemplate {
             manga_id,
-            title,
+            title: "".to_string(),
             items,
             limit,
             offset: new_current_page,
@@ -532,6 +532,8 @@ async fn main() {
         .route("/manga/:id/chapters", post(post_chapters_by_manga_id))
         .route("/configure-book/:id", get(get_configure_book))
         .route("/configure-book/:id", post(post_configure_book))
+        .nest("/book/new", views::book_new::get_routes())
+        .nest("/book", views::book::get_routes())
         .nest_service("/public", ServeDir::new("public"))
         .fallback(not_found)
         .layer(Extension(pool))

@@ -1,0 +1,29 @@
+* {
+  user-select: none;
+}
+tr:has(input:checked) {
+  background-color: hsla(195, 100%, 90%, 0.5);
+}
+.fake-check::after {
+  content: "✓";
+  color: hsl(120, 66%, 48%);
+  position: absolute;
+  top: -7px;
+}
+.fake-check {
+  font-size: 1.5em;
+  visibility: hidden;
+  position: relative;
+}
+tr:has(input:checked) .fake-check {
+  visibility: visible;
+}
+
+.control-bar {
+  position: sticky;
+  top: 0;
+  left: 0;
+  right: 0;
+  padding: 1em;
+  z-index: 10;
+}

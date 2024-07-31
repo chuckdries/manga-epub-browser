@@ -6,7 +6,7 @@ use graphql_client::{reqwest::post_graphql, GraphQLQuery};
 use sqlx::SqlitePool;
 use tokio::time::{sleep, Duration};
 
-use futures::future::{join_all};
+use futures::future::join_all;
 use futures::prelude::*;
 use regex::Regex;
 
@@ -130,13 +130,7 @@ pub struct SpecificMangaChapters;
 
 pub async fn get_chapters_by_manga_id(
     id: i64,
-) -> Result<
-    (
-        String,
-        Vec<specific_manga_chapters::SpecificMangaChaptersMangaChaptersNodes>,
-    ),
-    Error,
-> {
+) -> Result<Vec<specific_manga_chapters::SpecificMangaChaptersMangaChaptersNodes>, Error> {
     let client = reqwest::Client::new();
 
     return match post_graphql::<SpecificMangaChapters, _>(
@@ -147,7 +141,7 @@ pub async fn get_chapters_by_manga_id(
     .await?
     .data
     {
-        Some(data) => Ok((data.manga.title, data.manga.chapters.nodes)),
+        Some(data) => Ok(data.manga.chapters.nodes),
         None => Err(anyhow!("Missing response data")),
     };
 }

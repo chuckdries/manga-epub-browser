@@ -52,6 +52,7 @@ pub struct SqlBook {
     pub status: i64,
 }
 
+#[derive(Debug)]
 pub struct Book {
     pub id: i64,
     pub manga_id: i64,
@@ -143,14 +144,13 @@ pub async fn get_book_with_chapters_by_id(
         chapters.insert(chapter.chapter_id.expect("BookChapter missing chapter_id"));
     });
 
-    dbg!(&chapters);
-
     Ok(Some(BookWithChapters {
         book: book.expect("Book missing params"),
         chapters,
     }))
 }
 
+#[derive(Debug, PartialEq)]
 pub enum BookStatus {
     DRAFT = 1,
     DOWNLOADING = 2,
