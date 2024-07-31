@@ -2,6 +2,7 @@ use std::io::{copy, Cursor};
 use std::{collections::HashSet, env};
 
 use anyhow::{anyhow, Error, Result};
+use eyre::eyre;
 use graphql_client::{reqwest::post_graphql, GraphQLQuery};
 use sqlx::SqlitePool;
 use tokio::time::{sleep, Duration};
@@ -25,7 +26,7 @@ use crate::{
 )]
 pub struct GetLibrary;
 
-pub async fn get_library() -> Result<Vec<get_library::GetLibraryMangasNodes>, Error> {
+pub async fn get_library() -> Result<Vec<get_library::GetLibraryMangasNodes>, AppError> {
     let client = reqwest::Client::new();
 
     return match post_graphql::<GetLibrary, _>(
@@ -78,7 +79,7 @@ pub struct MangaSourceSearch;
 
 pub async fn search_manga_by_title(
     variables: manga_source_search::Variables,
-) -> Result<Vec<manga_source_search::MangaSourceSearchFetchSourceMangaMangas>, Error> {
+) -> Result<Vec<manga_source_search::MangaSourceSearchFetchSourceMangaMangas>, AppError> {
     let client = reqwest::Client::new();
 
     return match post_graphql::<MangaSourceSearch, _>(
@@ -90,7 +91,7 @@ pub async fn search_manga_by_title(
     .data
     {
         Some(data) => Ok(data.fetch_source_manga.mangas),
-        None => Err(anyhow!("Missing response data")),
+        None => Err(eyre!("Missing response data").into()),
     };
 }
 
@@ -104,7 +105,7 @@ pub struct SpecificMangaById;
 
 pub async fn get_manga_by_id(
     id: i64,
-) -> Result<specific_manga_by_id::SpecificMangaByIdManga, Error> {
+) -> Result<specific_manga_by_id::SpecificMangaByIdManga, AppError> {
     let client = reqwest::Client::new();
 
     return match post_graphql::<SpecificMangaById, _>(
@@ -116,7 +117,7 @@ pub async fn get_manga_by_id(
     .data
     {
         Some(data) => Ok(data.manga),
-        None => Err(anyhow!("Missing response data")),
+        None => Err(eyre!("Missing response data").into()),
     };
 }
 
@@ -130,7 +131,7 @@ pub struct SpecificMangaChapters;
 
 pub async fn get_chapters_by_manga_id(
     id: i64,
-) -> Result<Vec<specific_manga_chapters::SpecificMangaChaptersMangaChaptersNodes>, Error> {
+) -> Result<Vec<specific_manga_chapters::SpecificMangaChaptersMangaChaptersNodes>, AppError> {
     let client = reqwest::Client::new();
 
     return match post_graphql::<SpecificMangaChapters, _>(
@@ -142,7 +143,7 @@ pub async fn get_chapters_by_manga_id(
     .data
     {
         Some(data) => Ok(data.manga.chapters.nodes),
-        None => Err(anyhow!("Missing response data")),
+        None => Err(eyre!("Missing response data").into()),
     };
 }
 
@@ -189,7 +190,7 @@ pub async fn download_chapters_from_source(
     .data
     {
         Some(data) => data.chapters.nodes,
-        None => return Err(anyhow!("Missing response data").into()),
+        None => return Err(eyre!("Missing response data").into()),
     };
 
     let chapters_to_download: Vec<_> = chapters_download_status
@@ -248,7 +249,7 @@ async fn dl_img(url: &str, dl_dirname: &str) -> Result<(), AppError> {
     // let client = reqwest::Client::new();
     let re = Regex::new(r"/api/v1/manga/\d+/chapter/\d+/page/(\d+)").unwrap();
     let Some(caps) = re.captures(url) else {
-        return Err(anyhow!("Couldn't parse image url").into());
+        return Err(eyre!("Couldn't parse image url").into());
     };
     let dl_prefix = &env::var("CHAPTER_DL_PATH").unwrap_or("data/chapters".to_string());
     let dl_dir = format!("{}/{}", dl_prefix, dl_dirname);
@@ -261,17 +262,17 @@ async fn dl_img(url: &str, dl_dirname: &str) -> Result<(), AppError> {
         .to_str()
         .unwrap();
     if !content_type.starts_with("image/") {
-        return Err(anyhow!("Not an image: {:?} (downloading {})", content_type, url).into());
+        return Err(eyre!("Not an image: {:?} (downloading {})", content_type, url).into());
     }
     let extension = match content_type.split("/").last() {
         Some(ext) => ext,
-        None => return Err(anyhow!("Couldn't parse image extension").into()),
+        None => return Err(eyre!("Couldn't parse image extension").into()),
     };
     let mut file = match std::fs::File::create(format!("{}/{}.{}", &dl_dir, &caps[1], &extension)) {
         Ok(f) => f,
         Err(e) => {
             println!("Couldn't create file: {:?}", e);
-            return Err(anyhow!("Couldn't create file: {:?}", e).into());
+            return Err(eyre!("Couldn't create file: {:?}", e).into());
         }
     };
     let mut content = Cursor::new(response.bytes().await?);

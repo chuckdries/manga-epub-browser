@@ -1,4 +1,10 @@
-use std::{collections::HashSet, env, fs::{self, File}, path::Path};
+use std::{
+    collections::HashSet,
+    env,
+    fs::{self, File},
+    io::Cursor,
+    path::Path,
+};
 
 use anyhow::{anyhow, Error};
 use epub_builder::{EpubBuilder, EpubContent, ZipLibrary};
@@ -33,7 +39,7 @@ async fn compile_book(pool: &SqlitePool, book_id: i64) -> Result<(), AppError> {
     println!("Downloading chapters from source");
     let book_and_chapters = match get_book_with_chapters_by_id(pool, book_id).await? {
         Some(book_and_chapters) => book_and_chapters,
-        None => return Err(anyhow!("Book not found").into()),
+        None => return Err(eyre!("Book not found").into()),
     };
     download_chapters_from_source(&book_and_chapters.chapters, book_id, &pool).await?;
     update_book_status(&pool, book_id, BookStatus::DownloadingFromSuwayomi).await?;
@@ -44,19 +50,21 @@ async fn compile_book(pool: &SqlitePool, book_id: i64) -> Result<(), AppError> {
     Ok(())
 }
 
-async fn assemble_epub(book: Book, chapter_ids: &HashSet<i64>) -> Result<(), AppError> {
-    let base_dir = &env::var("CHAPTER_DL_PATH").unwrap_or("data/chapters".to_string());
+pub async fn assemble_epub(book: Book, chapter_ids: &HashSet<i64>) -> Result<(), AppError> {
+    let chapter_base_dir = &env::var("CHAPTER_DL_PATH").unwrap_or("data/chapters".to_string());
     let mut epub = EpubBuilder::new(ZipLibrary::new()?)?;
-    epub.metadata("title", book.title)?;
-    epub.metadata("author", book.author)?;
+    epub.metadata("title", &book.title)?;
+    epub.metadata("author", &book.author)?;
 
     let chapters = match get_chapters_by_ids(&chapter_ids).await? {
         Some(chapters) => chapters.nodes,
-        None => return Err(anyhow!("Chapters not found").into()),
+        None => return Err(eyre!("Chapters not found").into()),
     };
     // Add chapters
     for chapter in chapters {
-        let chapter_dir = Path::new(&base_dir).join(&chapter.id.to_string());
+        dbg!(&chapter);
+        let chapter_dir = Path::new(&chapter_base_dir).join(&chapter.id.to_string());
+        dbg!(&chapter_dir);
         let mut pages = Vec::new();
 
         // Read image files from the chapter directory
@@ -68,30 +76,44 @@ async fn assemble_epub(book: Book, chapter_ids: &HashSet<i64>) -> Result<(), App
             }
         }
 
-        // Sort pages alphabetically
-        pages.sort();
+        // TODO improve error handling
+        pages.sort_by_key(|page_path| {
+            page_path
+                .file_stem()
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .parse::<i32>()
+                .unwrap()
+        });
 
         // Create chapter content
         let mut chapter_content = String::new();
-        chapter_content.push_str(&format!("<h1>{}</h1>", chapter.name));
+        chapter_content.push_str("<?xml version='1.0' encoding='utf-8'?>\n<html xmlns=\"http://www.w3.org/1999/xhtml\">\n<head/><body>\n");
+        chapter_content.push_str(&format!("<h1>{}</h1>\n", chapter.name));
 
         for page in pages {
             let image_data = fs::read(&page)?;
-            let file_name = page.file_name().unwrap().to_str().unwrap();
-            epub.add_resource(file_name, image_data, "image/jpeg")?;
-            chapter_content.push_str(&format!("<img src=\"{}\" />", file_name));
+            let og_file_name = page.file_name().unwrap().to_str().unwrap();
+            let mime_type = format!("image/{}", page.extension().unwrap().to_str().unwrap());
+            let file_name = format!("{}/{}", &chapter.id, og_file_name);
+            epub.add_resource(&file_name, Cursor::new(image_data), &mime_type)?;
+            chapter_content.push_str(&format!("<img src=\"{}\" />\n", &file_name));
         }
+
+        chapter_content.push_str("</body>\n</html>");
 
         // Add chapter to EPUB
         epub.add_content(
-            EpubContent::new(chapter.name, chapter_content)
-                .title(chapter.name)
-                .reftype("chapter"),
+            EpubContent::new(&chapter.name, Cursor::new(chapter_content)).title(chapter.name), // .reftype(Reference),
         )?;
     }
 
+    let epub_base_dir = &env::var("EPUB_OUT_PATH").unwrap_or("data/epubs".to_string());
+    std::fs::create_dir_all(&epub_base_dir)?;
+    let epub_filename = format!("{}.epub", &book.title);
     // Generate EPUB file
-    let mut output_file = File::create("output.epub")?;
+    let mut output_file = File::create(Path::new(&epub_base_dir).join(epub_filename))?;
     epub.generate(&mut output_file)?;
     Ok(())
 }

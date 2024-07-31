@@ -1,10 +1,10 @@
 query ChaptersByIds($ids: [Int!]) {
-  chapters(filter: {id: {in: $ids}}) {
+  chapters(filter: {id: {in: $ids}}, orderBy: CHAPTER_NUMBER) {
     nodes {
-      id,
-     	chapterNumber,
-      name,
-      scanlator,
+      id
+      chapterNumber
+      name
+      scanlator
       isRead
     }
   }

@@ -7,6 +7,7 @@ use axum::{
     Extension,
 };
 use axum_extra::extract::Form;
+use eyre::eyre;
 use serde::Deserialize;
 use sqlx::SqlitePool;
 
@@ -35,14 +36,14 @@ pub async fn view_configure_book(
     let book_id = params.0;
     let book_details = match ebook::get_book_with_chapters_by_id(&pool, book_id).await? {
         Some(book_details) => Ok(book_details),
-        None => Err(AppError(anyhow!("Book not found"))),
+        None => Err(AppError(eyre!("Book not found"))),
     }?;
     if book_details.book.status != ebook::BookStatus::Draft {
-        return Err(AppError(anyhow!("Book is not in draft status")));
+        return Err(AppError(eyre!("Book is not in draft status")));
     }
     let chapter_details = match suwayomi::get_chapters_by_ids(&book_details.chapters).await? {
         Some(chapter_details) => Ok(chapter_details),
-        None => Err(AppError(anyhow!("Chapters not found"))),
+        None => Err(AppError(eyre!("Chapters not found"))),
     }?;
     Ok(BookConfigure {
         book: book_details.book,

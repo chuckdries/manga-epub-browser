@@ -1,4 +1,3 @@
-use anyhow::Result;
 use askama::Template;
 
 use crate::{

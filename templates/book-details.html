@@ -5,6 +5,7 @@
     <div class="is-flex is-gap-2 mb-2 is-align-items-center">
         <h1 class="title mb-1">{{ book.title }}</h1>
         {% if book.status == crate::ebook::BookStatus::Done %}<a href="/book/{{ book.id }}/download" class="button">Download</a>{% endif %}
+        {% if book.status == crate::ebook::BookStatus::Assembling %}<button hx-post="/book/{{ book.id }}/assemble" class="button">Assemble</a>{% endif %}
     </div>
     <div class="tags are-medium">
         <span class="tag">id: {{ book.id }}</span>

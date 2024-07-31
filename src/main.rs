@@ -19,6 +19,7 @@ use axum_extra::extract::Form;
 use ebook::{
     commit_chapter_selection, get_book_by_id, get_book_with_chapters_by_id, update_book_details,
 };
+use eyre::eyre;
 use serde::{Deserialize, Serialize};
 use serde_json::{
     // json,
@@ -63,20 +64,14 @@ extern crate log;
 // CQ clean up this error handling mess
 // Make our own error that wraps `anyhow::Error`.
 #[derive(Debug)]
-struct AppError(anyhow::Error);
-
-impl From<eyre::Report> for AppError {
-    fn from(err: eyre::Report) -> Self {
-        Self(anyhow!(err))
-    }
-}
+struct AppError(eyre::Report);
 
 type AppResponse = Result<Html<String>, AppError>;
 
 fn render<T: Serialize>(hbs: &Handlebars<'static>, name: &str, data: &T) -> AppResponse {
     match hbs.render(name, data) {
         Ok(rendered) => Ok(Html(rendered)),
-        Err(msg) => Err(AppError(anyhow!(msg))),
+        Err(msg) => Err(AppError(eyre!(msg))),
     }
 }
 
@@ -106,12 +101,18 @@ impl IntoResponse for AppError {
 // `Result<_, AppError>`. That way you don't need to do that manually.
 impl<E> From<E> for AppError
 where
-    E: Into<anyhow::Error>,
+    E: Into<eyre::Report>,
 {
     fn from(err: E) -> Self {
         Self(err.into())
     }
 }
+
+// impl From<eyre::Report> for AppError {
+//     fn from(err: eyre::Report) -> Self {
+//         Self(eyre!(err.to_string()))
+//     }
+// }
 
 async fn not_found() -> impl IntoResponse {
     Html("<h1>404 Not found</h1><a href=\"/\">Back home</a>")
@@ -410,7 +411,7 @@ async fn get_configure_book(
 ) -> Result<ConfigureBookTemplate, AppError> {
     let book = match get_book_by_id(&pool, params.0).await? {
         Some(book) => Ok(book),
-        None => Err(anyhow!("Book not found")),
+        None => Err(eyre!("Book not found")),
     }?;
 
     Ok(ConfigureBookTemplate {
@@ -434,7 +435,7 @@ async fn post_configure_book(
 ) -> Result<impl IntoResponse, AppError> {
     let book = match get_book_with_chapters_by_id(&pool, params.0).await? {
         Some(book) => Ok(book),
-        None => Err(anyhow!("Book not found")),
+        None => Err(eyre!("Book not found")),
     }?;
     update_book_details(&pool, params.0, &data.title, &data.author).await?;
 
@@ -465,7 +466,7 @@ async fn home() -> Result<HomeTemplate, AppError> {
     })
     // match handlebars.render("home", &HomeTemplate { sources, books }) {
     //     Ok(rendered) => Ok(Html(rendered)),
-    //     Err(msg) => Err(AppError(anyhow!(msg))),
+    //     Err(msg) => Err(AppError(eyre!(msg))),
     // }
 }
 
