@@ -71,6 +71,5 @@ pub async fn post_configure_book(
         return Ok(Redirect::to("/books").into_response());
     }
     begin_compile_book(pool, id).await?;
-    // Ok(Redirect::to(&format!("/book/{}/status", id)).into_response())
-    Ok(Redirect::to("/books").into_response())
+    Ok(Redirect::to(&format!("/book/{}", id)).into_response())
 }

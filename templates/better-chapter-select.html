@@ -3,9 +3,7 @@
 {% endblock %} {% block content %}
 <form class="section" action="/book/new/select-chapters" method="post">
   <input type="hidden" name="manga_id" value="{{ manga_id }}">
-  <div
-    class="is-flex is-justify-content-space-between is-align-items-center"
-  >
+  <div class="is-flex is-justify-content-space-between is-align-items-center">
     <div>
       <h1 class="title is-4 *-0">2. Select chapters</h1>
       <p class="subtitle *-0">
@@ -13,6 +11,11 @@
       </p>
     </div>
     <div>
+      {% if hide_read %}
+      <a class="button" href="/book/new/select-chapters?mangaId={{ manga_id }}&hide_read=false">Show read</a>
+      {% else %}
+      <a class="button" href="/book/new/select-chapters?mangaId={{ manga_id }}&hide_read=true">Hide read</a>
+      {% endif %}
       <button class="button is-link" type="submit">Next</button>
     </div>
   </div>
@@ -26,19 +29,12 @@
     </thead>
     <tbody>
       {% for chapter in chapters %}
-      <tr
-        id="chapter-{{chapter.chapter_number}}"
-        _="on mousedown or mouseenter [buttons==1] toggle @checked on <input/> in me"
-      >
+      <tr id="chapter-{{chapter.chapter_number}}"
+        _="on mousedown or mouseenter [buttons==1] toggle @checked on <input/> in me">
         <td>
           <div class="fake-check"></div>
-          <input
-            style="visibility: hidden"
-            type="checkbox"
-            name="chapter_id"
-            value="{{ chapter.id }}"
-            alt="inlcude chapter {{chapter.name}} in book"
-          />
+          <input style="visibility: hidden" type="checkbox" name="chapter_id" value="{{ chapter.id }}"
+            alt="inlcude chapter {{chapter.name}} in book" />
         </td>
         <td>{{ chapter.name }}</td>
         <td>{% if let Some(scanlator) = chapter.scanlator %}{{ scanlator }}{% endif %}</td>

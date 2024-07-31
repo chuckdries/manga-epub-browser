@@ -237,7 +237,7 @@ pub async fn download_chapters_from_source(
         }
 
         // Wait for a specified interval before polling again
-        sleep(Duration::from_secs(5)).await;
+        sleep(Duration::from_secs(2)).await;
     }
 
     println!("download from source complete");

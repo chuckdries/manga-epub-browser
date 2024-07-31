@@ -8,7 +8,9 @@ use serde::Deserialize;
 use sqlx::SqlitePool;
 
 use crate::{
-    ebook, suwayomi::{self, specific_manga_chapters::SpecificMangaChaptersMangaChaptersNodes}, AppError
+    ebook,
+    suwayomi::{self, specific_manga_chapters::SpecificMangaChaptersMangaChaptersNodes},
+    AppError,
 };
 
 #[derive(Template)]
@@ -16,11 +18,13 @@ use crate::{
 pub struct ChapterSelect {
     chapters: Vec<SpecificMangaChaptersMangaChaptersNodes>,
     manga_id: i64,
+    hide_read: bool,
 }
 
 #[derive(Deserialize)]
 pub struct ChapterSelectParams {
     mangaId: i64,
+    hide_read: Option<bool>,
 }
 
 #[axum::debug_handler]
@@ -28,8 +32,22 @@ pub async fn view_chapter_select(
     Query(params): Query<ChapterSelectParams>,
 ) -> Result<ChapterSelect, AppError> {
     let manga_id = params.mangaId;
-    let chapters = suwayomi::get_chapters_by_manga_id(manga_id).await?;
-    Ok(ChapterSelect { chapters, manga_id })
+    let all_chapters = suwayomi::get_chapters_by_manga_id(manga_id).await?;
+    let (chapters, hide_read) = match params.hide_read {
+        Some(true) => (
+            all_chapters
+                .into_iter()
+                .filter(|chapter| !chapter.is_read)
+                .collect(),
+            true,
+        ),
+        _ => (all_chapters, false),
+    };
+    Ok(ChapterSelect {
+        chapters,
+        manga_id,
+        hide_read,
+    })
 }
 
 #[derive(Deserialize)]
@@ -51,6 +69,7 @@ pub async fn post_chapter_select(
         params.manga_id,
         &manga.title,
         &author,
-    ).await?;
+    )
+    .await?;
     Ok(Redirect::to(&format!("/book/{}/configure", book_id)))
 }

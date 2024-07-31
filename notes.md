@@ -1,10 +1,15 @@
 TODO
 - [x] implement fetching chapters from suwayomi to disk
-- [ ] implement stitching chapters into epub file
+- [-] implement stitching chapters into epub file
 - [ ] better error handling (correct codes, better types?)
 - [ ] resume interrupted download/compilation
     - [ ] skip downloading existing images from suwayomi? or just whole chapters?
-- [ ] status page + download progress
+    - [ ] job system?
+- [ ] epub file name collision handling?
+- [ ] epub download page
+- [ ] display download progress
+- [ ] display book job progress
+- [ ] resize images
 
 # redesign
 new concept:
