@@ -1,0 +1,39 @@
+{% extends "base.html" %} {% block title %}Books{% endblock %}
+<!-- asdf -->
+{% block content %}
+<div class="section">
+    <div class="is-flex is-gap-2 mb-2 is-align-items-center">
+        <h1 class="title mb-1">{{ book.title }}</h1>
+        {% if book.status == crate::ebook::BookStatus::DONE %}<a href="/book/{{ book.id }}/download" class="button">Download</a>{% endif %}
+    </div>
+    <div class="tags are-medium">
+        <span class="tag">id: {{ book.id }}</span>
+        <span class="tag">author: {{ book.author }}</span>
+        <span class="tag">status: {{ book.status }}</span>
+    </div>
+</div>
+<div class="section">
+    <h2 class="title">Chapters</h2>
+    <table class="table is-fullwidth">
+        <thead>
+            <tr>
+                <th>Chapter</th>
+                <th>Scanlator</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for chapter in chapters %}
+            <tr>
+                <td>{{ chapter.name }}</td>
+                <td>
+                    {% if let Some(scanlator) = chapter.scanlator %}{{ scanlator }}{%
+                    endif %}
+                </td>
+                <td></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

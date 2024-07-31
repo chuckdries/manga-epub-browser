@@ -49,6 +49,8 @@ use handlebars::{handlebars_helper, DirectorySourceOptions, Handlebars};
 use tower_http::services::ServeDir;
 use tower_sessions::{cookie::time::Duration, Expiry, MemoryStore, Session, SessionManagerLayer};
 
+use local_ip_address::local_ip;
+
 mod ebook;
 mod suwayomi;
 mod util; // Declare the util module
@@ -403,7 +405,7 @@ async fn get_configure_book(
     params: Path<i64>,
     Extension(pool): Extension<SqlitePool>,
 ) -> Result<ConfigureBookTemplate, AppError> {
-    let book = match get_book_by_id(pool, params.0).await? {
+    let book = match get_book_by_id(&pool, params.0).await? {
         Some(book) => Ok(book),
         None => Err(anyhow!("Book not found")),
     }?;
@@ -534,6 +536,7 @@ async fn main() {
         .route("/configure-book/:id", post(post_configure_book))
         .nest("/book/new", views::book_new::get_routes())
         .nest("/book", views::book::get_routes())
+        .nest("/books", views::books::get_routes())
         .nest_service("/public", ServeDir::new("public"))
         .fallback(not_found)
         .layer(Extension(pool))
@@ -541,6 +544,6 @@ async fn main() {
         .layer(session_layer);
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
-    println!("listening on {}", listener.local_addr().unwrap());
+    println!("listening on http://{}:3000", local_ip().unwrap());
     axum::serve(listener, app).await.unwrap();
 }

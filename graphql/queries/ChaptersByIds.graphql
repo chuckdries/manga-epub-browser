@@ -1,6 +1,7 @@
 query ChaptersByIds($ids: [Int!]) {
   chapters(filter: {id: {in: $ids}}) {
     nodes {
+      id,
      	chapterNumber,
       name,
       scanlator

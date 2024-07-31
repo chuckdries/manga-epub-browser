@@ -1,13 +1,22 @@
 {% extends "base.html" %} {% block head %}
 <link rel="stylesheet" href="/public/better-chapter-select.css" />
 {% endblock %} {% block content %}
-<form class="p-0" action="/book/new/select-chapters" method="get">
+<!-- <div class="section">
+  <h1 class="title">1. Select source manga</h1>
+</div>
+<div class="section">
+  <h2 class="title">2. Select chapter range</h2>
+</div>
+<div class="section">
+  <h2 class="title">3. Configure book</h2>
+</div> -->
+<form class="section" action="/book/new/select-chapters" method="get">
   <div
-    class="control-bar has-background-light is-flex is-justify-content-space-between is-align-items-center"
+    class="is-flex is-justify-content-space-between is-align-items-center"
   >
     <div>
-      <h1 class="title is-4">Select manga to create epub from</h1>
-      <p class="subtitle">Visit Suwayomi to add more manga to your library</p>
+      <h1 class="title is-4">1. Select source title</h1>
+      <p class="subtitle">Visit Suwayomi to add more titles to your library</p>
     </div>
     <div>
       <button class="button is-link" type="submit">Next</button>
