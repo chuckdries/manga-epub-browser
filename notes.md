@@ -3,6 +3,7 @@ TODO
 - [ ] implement stitching chapters into epub file
 - [ ] better error handling (correct codes, better types?)
 - [ ] resume interrupted download/compilation
+    - [ ] skip downloading existing images from suwayomi? or just whole chapters?
 - [ ] status page + download progress
 
 # redesign

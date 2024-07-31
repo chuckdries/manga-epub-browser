@@ -1,8 +1,6 @@
 extern crate dotenv;
 use anyhow::{
-    anyhow,
-    // Error,
-    Result,
+    anyhow, Error, Result
 };
 use askama::{Template, DynTemplate};
 use axum::{
@@ -66,6 +64,12 @@ extern crate log;
 // Make our own error that wraps `anyhow::Error`.
 #[derive(Debug)]
 struct AppError(anyhow::Error);
+
+impl From<eyre::Report> for AppError {
+    fn from(err: eyre::Report) -> Self {
+        Self(anyhow!(err))
+    }
+}
 
 type AppResponse = Result<Html<String>, AppError>;
 
@@ -521,20 +525,20 @@ async fn main() {
 
     // build our application with a single route
     let app = Router::new()
-        .route("/", get(home))
-        .route("/search", get(search_results))
-        .route("/manga/:id", get(manga_by_id))
-        .route("/manga/:id/chapters", get(get_chapters_by_manga_id))
-        .route("/manga/:id/chapters", post(post_chapters_by_manga_id))
-        .route("/configure-book/:id", get(get_configure_book))
-        .route("/configure-book/:id", post(post_configure_book))
+        .route("/", get(Redirect::to("/books")))
+        // .route("/search", get(search_results))
+        // .route("/manga/:id", get(manga_by_id))
+        // .route("/manga/:id/chapters", get(get_chapters_by_manga_id))
+        // .route("/manga/:id/chapters", post(post_chapters_by_manga_id))
+        // .route("/configure-book/:id", get(get_configure_book))
+        // .route("/configure-book/:id", post(post_configure_book))
         .nest("/book/new", views::book_new::get_routes())
         .nest("/book", views::book::get_routes())
         .nest("/books", views::books::get_routes())
         .nest_service("/public", ServeDir::new("public"))
         .fallback(not_found)
         .layer(Extension(pool))
-        .layer(Extension(handlebars))
+        // .layer(Extension(handlebars))
         .layer(session_layer);
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
