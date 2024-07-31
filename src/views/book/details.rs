@@ -6,7 +6,7 @@ use sqlx::SqlitePool;
 use crate::{
     ebook::{get_book_with_chapters_by_id, Book},
     suwayomi::{
-        chapters_by_ids::{ChaptersByIdsChapters, ChaptersByIdsChaptersNodes},
+        chapters_by_ids::ChaptersByIdsChaptersNodes,
         get_chapters_by_ids,
     },
     AppError,

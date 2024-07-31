@@ -4,7 +4,7 @@
 <div class="section">
     <div class="is-flex is-gap-2 mb-2 is-align-items-center">
         <h1 class="title mb-1">{{ book.title }}</h1>
-        {% if book.status == crate::ebook::BookStatus::DONE %}<a href="/book/{{ book.id }}/download" class="button">Download</a>{% endif %}
+        {% if book.status == crate::ebook::BookStatus::Done %}<a href="/book/{{ book.id }}/download" class="button">Download</a>{% endif %}
     </div>
     <div class="tags are-medium">
         <span class="tag">id: {{ book.id }}</span>
@@ -17,6 +17,7 @@
     <table class="table is-fullwidth">
         <thead>
             <tr>
+                <th>id</th>
                 <th>Chapter</th>
                 <th>Scanlator</th>
                 <th></th>
@@ -25,6 +26,7 @@
         <tbody>
             {% for chapter in chapters %}
             <tr>
+                <td>{{ chapter.id }}</td>
                 <td>{{ chapter.name }}</td>
                 <td>
                     {% if let Some(scanlator) = chapter.scanlator %}{{ scanlator }}{%

@@ -23,10 +23,10 @@
             <td>{{ book.author }}</td>
             <td>{{ book.status }}</td>
             <td>
-                {% if book.status != crate::ebook::BookStatus::DRAFT %}
+                {% if book.status != crate::ebook::BookStatus::Draft %}
                 <a class="button" href="/book/{{book.id}}">View</a>
                 {% endif %}
-                {% if book.status == crate::ebook::BookStatus::DRAFT %}
+                {% if book.status == crate::ebook::BookStatus::Draft %}
                 <a class="button is-link" href="/book/{{book.id}}/configure">
                     Configure
                 </a>

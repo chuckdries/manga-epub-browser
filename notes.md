@@ -1,11 +1,9 @@
 TODO
-- [ ] check what's already implemented regarding ebook generation
-  - [ ] tokio to spawn worker threads for background work??
-- [ ] (finish?) implement fetching chapters from suwayomi to disk
-  - [ ] file creation not working atm
+- [x] implement fetching chapters from suwayomi to disk
 - [ ] implement stitching chapters into epub file
-
 - [ ] better error handling (correct codes, better types?)
+- [ ] resume interrupted download/compilation
+- [ ] status page + download progress
 
 # redesign
 new concept:

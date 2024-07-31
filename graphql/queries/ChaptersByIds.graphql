@@ -4,7 +4,8 @@ query ChaptersByIds($ids: [Int!]) {
       id,
      	chapterNumber,
       name,
-      scanlator
+      scanlator,
+      isRead
     }
   }
 }

@@ -28,10 +28,7 @@ use serde_json::{
 };
 use sqlx::SqlitePool;
 use std::{
-    collections::{HashMap, HashSet},
-    i64::MAX,
-    // net::SocketAddr,
-    sync::Arc,
+    collections::{HashMap, HashSet}, fmt::Debug, i64::MAX, sync::Arc
 };
 // use suwayomi::download_chapters;
 // use suwayomi::get_chapters_by_id;
@@ -55,6 +52,7 @@ mod ebook;
 mod suwayomi;
 mod util; // Declare the util module
 mod views;
+mod services;
 
 extern crate pretty_env_logger;
 // #[macro_use]
@@ -66,6 +64,7 @@ extern crate log;
 
 // CQ clean up this error handling mess
 // Make our own error that wraps `anyhow::Error`.
+#[derive(Debug)]
 struct AppError(anyhow::Error);
 
 type AppResponse = Result<Html<String>, AppError>;
@@ -434,12 +433,7 @@ async fn post_configure_book(
         None => Err(anyhow!("Book not found")),
     }?;
     update_book_details(&pool, params.0, &data.title, &data.author).await?;
-    tokio::spawn(async move {
-        match download_chapters(book.chapters, book.book.id, &pool).await {
-            Ok(()) => (),
-            Err(e) => println!("{:#?}", e.0),
-        }
-    });
+
     Ok(Redirect::to(&format!("/")))
 }
 
