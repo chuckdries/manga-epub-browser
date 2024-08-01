@@ -8,7 +8,7 @@ use axum::{
     Extension, Router,
 };
 use serde::{Deserialize, Serialize};
-use services::book_compiler::resume_interrupted_tasks;
+use services::{book_compiler::resume_interrupted_tasks, exporter::resume_interrupted_exports};
 use sqlx::SqlitePool;
 use std::{
     collections::{HashMap, HashSet},
@@ -45,6 +45,12 @@ extern crate log;
 // Make our own error that wraps `anyhow::Error`.
 #[derive(Debug)]
 struct AppError(eyre::Report);
+
+impl std::fmt::Display for AppError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
 
 #[derive(Template)]
 #[template(path = "error.html")]
@@ -136,7 +142,8 @@ async fn main() {
 
     let pool_clone = Arc::new(pool);
 
-    resume_interrupted_tasks(pool_clone.clone()).await.unwrap();
+    // resume_interrupted_tasks(pool_clone.clone()).await.unwrap();
+    resume_interrupted_exports(pool_clone.clone()).await.unwrap();
 
     let session_store = MemoryStore::default();
     let session_layer = SessionManagerLayer::new(session_store)

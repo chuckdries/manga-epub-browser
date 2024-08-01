@@ -257,7 +257,7 @@ async fn perform_step(
                 Some(book_and_chapters) => book_and_chapters,
                 None => return Err(eyre!("Book not found").into()),
             };
-            assemble_epub(book_and_chapters.book, &book_and_chapters.chapters).await?;
+            assemble_epub_old(book_and_chapters.book, &book_and_chapters.chapters).await?;
             task.current_step = CompileTaskStep::Complete;
         }
         CompileTaskStep::Complete => {
@@ -267,7 +267,7 @@ async fn perform_step(
     Ok(())
 }
 
-pub async fn assemble_epub(book: Book, chapter_ids: &HashSet<i64>) -> Result<(), AppError> {
+pub async fn assemble_epub_old(book: Book, chapter_ids: &HashSet<i64>) -> Result<(), AppError> {
     let chapter_base_dir = &env::var("CHAPTER_DL_PATH").unwrap_or("data/chapters".to_string());
     let mut epub = EpubBuilder::new(ZipLibrary::new()?)?;
     epub.metadata("title", &book.title)?;

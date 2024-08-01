@@ -3,7 +3,7 @@ use std::{
     env,
     fs::{self, File},
     io::Cursor,
-    path::Path,
+    path::{Path, PathBuf},
     sync::Arc,
 };
 
@@ -12,14 +12,14 @@ use eyre::eyre;
 use sqlx::SqlitePool;
 
 use crate::{
-    models::{export::Export, export_log::log_export_step},
+    models::{export::{get_export_base_dir, Export}, export_log::log_export_step},
     suwayomi::get_chapters_by_ids,
     AppError,
 };
 
 pub async fn assemble_epub(
     pool: Arc<SqlitePool>,
-    export: Export,
+    export: &Export,
     chapter_ids: &HashSet<i64>,
 ) -> Result<(), AppError> {
     let chapter_base_dir = &env::var("CHAPTER_DL_PATH").unwrap_or("data/chapters".to_string());
@@ -87,11 +87,10 @@ pub async fn assemble_epub(
         .unwrap();
     }
 
-    let epub_base_dir = &env::var("EPUB_OUT_PATH").unwrap_or("data/epubs".to_string());
+    let epub_base_dir = &get_export_base_dir();
     std::fs::create_dir_all(&epub_base_dir)?;
-    let epub_filename = format!("{}.epub", &export.title);
     // Generate EPUB file
-    let mut output_file = File::create(Path::new(&epub_base_dir).join(epub_filename))?;
+    let mut output_file = File::create(export.get_path())?;
     epub.generate(&mut output_file)?;
     Ok(())
 }

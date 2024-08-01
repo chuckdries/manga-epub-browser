@@ -28,19 +28,19 @@ struct CbzChapter {
 }
 
 // TODO log events and errors
-pub async fn compile_manga_to_cbz(
+pub async fn assemble_cbz(
     pool: Arc<SqlitePool>,
-    export: Export,
+    export: &Export,
     chapter_ids: &HashSet<i64>,
 ) -> Result<(), AppError> {
     let chapter_base_dir = &env::var("CHAPTER_DL_PATH").unwrap_or("data/chapters".to_string());
-    let output_file_name = format!("{}.cbz", export.title.replace(" ", "_"));
-    let file = File::create(&output_file_name)?;
+    let output_path = export.get_path();
+    let file = File::create(&output_path)?;
     let mut zip = ZipWriter::new(file);
 
     let metadata = CbzMetadata {
-        title: export.title,
-        author: export.author,
+        title: export.title.to_owned(),
+        author: export.author.to_owned(),
     };
 
     // Write metadata
@@ -75,7 +75,7 @@ pub async fn compile_manga_to_cbz(
     }
 
     zip.finish()?;
-    println!("CBZ file created: {}", output_file_name);
+    println!("CBZ file created: {:?}", output_path);
     Ok(())
 }
 
@@ -84,11 +84,15 @@ fn add_directory_to_zip<T: Write + Seek>(
     dir_path: &Path,
     zip_path: &str,
 ) -> io::Result<()> {
+    dbg!(&dir_path);
+    dbg!(&zip_path);
     for entry in fs::read_dir(dir_path)? {
+        dbg!(&entry);
         let entry = entry?;
         let path = entry.path();
 
         if path.is_dir() {
+            println!("path is dir {:?}", path);
             add_directory_to_zip(
                 zip,
                 &path,
@@ -100,6 +104,7 @@ fn add_directory_to_zip<T: Write + Seek>(
             )?;
         } else {
             let mut file = File::open(&path)?;
+            dbg!(&file);
             let file_name = path.file_name().unwrap().to_str().unwrap();
             zip.start_file(
                 format!("{}/{}", zip_path, file_name),

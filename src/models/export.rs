@@ -1,6 +1,9 @@
-use std::{collections::HashSet, fmt};
+use std::{
+    collections::HashSet,
+    env, fmt,
+    path::{Path, PathBuf},
+};
 
-use chrono::{DateTime, Local, NaiveDateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::{error::ErrorKind, SqlitePool};
 use time::OffsetDateTime;
@@ -38,11 +41,40 @@ pub enum ExportState {
     Failed,
 }
 
+impl std::fmt::Display for ExportState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ExportState::Draft => write!(f, "Draft"),
+            ExportState::InProgress => write!(f, "In progress"),
+            ExportState::Completed => write!(f, "Completed"),
+            ExportState::Failed => write!(f, "Failed"),
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, sqlx::Type, PartialEq)]
 #[sqlx(rename_all = "snake_case")]
 pub enum ExportFormat {
     Epub,
     Cbz,
+}
+
+impl std::fmt::Display for ExportFormat {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            ExportFormat::Epub => write!(f, "EPUB"),
+            ExportFormat::Cbz => write!(f, "CBZ"),
+        }
+    }
+}
+
+impl ExportFormat {
+    pub fn to_extension(&self) -> &str {
+        match self {
+            ExportFormat::Epub => "epub",
+            ExportFormat::Cbz => "cbz",
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
@@ -55,6 +87,25 @@ pub struct Export {
     pub step: ExportStep,
     pub progress: i64,
     pub created_at: OffsetDateTime,
+}
+
+pub fn get_export_base_dir() -> String {
+    env::var("EXPORT_PATH").unwrap_or("data/exports".to_string())
+}
+
+impl Export {
+    pub fn get_filename(&self) -> String {
+        let extension = self.format.to_extension();
+        dbg!(&extension);
+        format!("{}.{}", self.title, extension)
+    }
+    pub fn get_path(&self) -> PathBuf {
+        let base_dir = get_export_base_dir();
+        dbg!(&base_dir);
+        let filename = self.get_filename();
+        dbg!(&filename);
+        Path::new(&base_dir).join(filename)
+    }
 }
 
 pub async fn get_export_by_id(pool: &SqlitePool, id: i64) -> Result<Option<Export>, AppError> {
@@ -81,7 +132,7 @@ pub async fn get_export_by_id(pool: &SqlitePool, id: i64) -> Result<Option<Expor
 pub async fn insert_export(
     pool: &SqlitePool,
     title: &str,
-    author: &str
+    author: &str,
 ) -> Result<i64, sqlx::Error> {
     let now = chrono::Local::now().to_rfc3339();
     let id = sqlx::query!(
@@ -101,21 +152,23 @@ pub async fn insert_export(
     .fetch_one(pool)
     .await?
     .id;
-    
+
     Ok(id)
 }
 
-pub async fn create_export(pool: &SqlitePool, title: &str, author: &str) -> Result<i64, sqlx::Error> {
+pub async fn create_export(
+    pool: &SqlitePool,
+    title: &str,
+    author: &str,
+) -> Result<i64, sqlx::Error> {
     let id = match insert_export(pool, title, author).await {
         Ok(id) => Ok(id),
-        Err(sqlx::Error::Database(e)) => {
-            match e.kind() {
-                ErrorKind::UniqueViolation => {
-                    let new_title = format!("{} ({})", title, OffsetDateTime::now_utc());
-                    Ok(insert_export(pool, &new_title, author).await?)
-                }
-                _ => Err(sqlx::Error::Database(e)),
+        Err(sqlx::Error::Database(e)) => match e.kind() {
+            ErrorKind::UniqueViolation => {
+                let new_title = format!("{} ({})", title, OffsetDateTime::now_utc());
+                Ok(insert_export(pool, &new_title, author).await?)
             }
+            _ => Err(sqlx::Error::Database(e)),
         },
         Err(e) => Err(e),
     }?;
@@ -182,29 +235,16 @@ pub async fn set_export_config(
 pub async fn set_export_state(
     pool: &SqlitePool,
     id: i64,
-    state: ExportState,
+    state: &ExportState,
+    step: &ExportStep,
 ) -> Result<(), AppError> {
     sqlx::query!(
         r#"
         UPDATE Export
-        SET state = ?
+        SET state = ?, step = ?
         WHERE id = ?
         "#,
         state,
-        id
-    )
-    .execute(pool)
-    .await?;
-    Ok(())
-}
-
-pub async fn set_export_step(pool: &SqlitePool, id: i64, step: ExportStep) -> Result<(), AppError> {
-    sqlx::query!(
-        r#"
-        UPDATE Export
-        SET step = ?
-        WHERE id = ?
-        "#,
         step,
         id
     )
@@ -230,6 +270,27 @@ pub async fn set_export_progress(
     .execute(pool)
     .await?;
     Ok(())
+}
+
+pub async fn get_export_chapters_by_id(
+    pool: &SqlitePool,
+    id: i64,
+) -> Result<HashSet<i64>, AppError> {
+    let chapters: HashSet<i64> = sqlx::query!(
+        r#"
+        SELECT chapter_id
+        FROM ExportChapters
+        WHERE export_id = ?
+        "#,
+        id
+    )
+    .fetch_all(pool)
+    .await?
+    .into_iter()
+    .map(|row| row.chapter_id)
+    .filter_map(|chapter_id| chapter_id)
+    .collect();
+    Ok(chapters)
 }
 
 pub async fn get_export_and_chapters_by_id(

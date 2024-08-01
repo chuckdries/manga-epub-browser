@@ -3,40 +3,22 @@
 {% block content %}
 <div class="section">
     <div class="is-flex is-gap-2 mb-2 is-align-items-center">
-        <h1 class="title mb-1">{{ book.title }}</h1>
-        {% if book.status == crate::ebook::BookStatus::Done %}<a href="/book/{{ book.id }}/download" class="button">Download</a>{% endif %}
-        {% if book.status == crate::ebook::BookStatus::Assembling %}<button hx-post="/book/{{ book.id }}/assemble" class="button">Assemble</a>{% endif %}
+        <h1 class="title mb-1">{{ export.title }}</h1>
+        {% if export.state == crate::models::export::ExportState::Completed %}<a download="{{ export.get_filename() }}" href="/export/{{ export.id }}/download"
+            class="button">Download</a>{% endif %}
+        {% if export.step == crate::models::export::ExportStep::AssemblingFile %}<button
+            hx-post="/export/{{ export.id }}/assemble" class="button">Assemble</a>{% endif %}
     </div>
     <div class="tags are-medium">
-        <span class="tag">id: {{ book.id }}</span>
-        <span class="tag">author: {{ book.author }}</span>
-        <span class="tag">status: {{ book.status }}</span>
+        <span class="tag">id: {{ export.id }}</span>
+        <span class="tag">author: {{ export.author }}</span>
+        <span class="tag">state: {{ export.state }}</span>
+        {% if export.state == crate::models::export::ExportState::InProgress %}<span class="tag">export step: {{
+            export.step }}</span>{% endif %}
     </div>
 </div>
 <div class="section">
     <h2 class="title">Chapters</h2>
-    <table class="table is-fullwidth">
-        <thead>
-            <tr>
-                <th>id</th>
-                <th>Chapter</th>
-                <th>Scanlator</th>
-                <th></th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for chapter in chapters %}
-            <tr>
-                <td>{{ chapter.id }}</td>
-                <td>{{ chapter.name }}</td>
-                <td>
-                    {% if let Some(scanlator) = chapter.scanlator %}{{ scanlator }}{%
-                    endif %}
-                </td>
-                <td></td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+    {{ chapter_table|safe }}
 </div>
 {% endblock %}

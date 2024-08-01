@@ -13,17 +13,14 @@ use serde::Deserialize;
 use sqlx::SqlitePool;
 
 use crate::{
-    services::book_compiler::begin_compile_book,
-    models::export::{Export, ExportFormat, ExportState, get_export_and_chapters_by_id, set_export_config},
-    suwayomi::{self, chapters_by_ids::ChaptersByIdsChaptersNodes},
-    AppError,
+    models::export::{get_export_and_chapters_by_id, set_export_config, Export, ExportFormat, ExportState}, services::{book_compiler::begin_compile_book, exporter::begin_export}, suwayomi::{self, chapters_by_ids::ChaptersByIdsChaptersNodes}, views::components::chapter_table::ChapterTable, AppError
 };
 
 #[derive(Template)]
 #[template(path = "export-configure.html")]
 pub struct ExportConfigure {
     export: Export,
-    chapters: Vec<ChaptersByIdsChaptersNodes>,
+    chapter_table: ChapterTable,
 }
 
 #[axum::debug_handler]
@@ -45,7 +42,9 @@ pub async fn view_configure_book(
     }?;
     Ok(ExportConfigure {
         export,
-        chapters: chapter_details.nodes,
+        chapter_table: ChapterTable {
+            chapters: chapter_details.nodes,
+        },
     }
     .into_response())
 }
@@ -69,6 +68,6 @@ pub async fn post_configure_export(
     if data.action == "save" {
         return Ok(Redirect::to("/exports").into_response());
     }
-    begin_compile_book(pool, id).await?;
+    begin_export(pool, id).await?;
     Ok(Redirect::to(&format!("/export/{}", id)).into_response())
 }

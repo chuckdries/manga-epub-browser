@@ -12,6 +12,7 @@
                 <th>id</th>
                 <th>Title</th>
                 <th>Author</th>
+                <th>Format</th>
                 <th>Status</th>
                 <th></th>
             </tr>
@@ -21,7 +22,8 @@
             <td>{{ export.id }}</td>
             <td>{{ export.title }}</td>
             <td>{{ export.author }}</td>
-            <td>{{ export.step }}</td>
+            <td>{{ export.format }}</td>
+            <td>{{ export.state }}</td>
             <td>
                 {% if export.state != crate::models::export::ExportState::Draft %}
                 <a class="button is-small" href="/export/{{export.id}}">View</a>

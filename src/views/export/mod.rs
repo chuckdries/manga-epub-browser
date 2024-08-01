@@ -2,9 +2,11 @@ use axum::{
     routing::{get, post},
     Router,
 };
+use tower_http::services::ServeFile;
 
 pub mod configure;
 mod details;
+mod download;
 
 pub fn get_routes() -> axum::Router {
     Router::new()
@@ -13,6 +15,5 @@ pub fn get_routes() -> axum::Router {
             "/:id/configure",
             get(configure::view_configure_book).post(configure::post_configure_export),
         )
-        // WIP manually call assemble for now
-        .route("/:id/assemble", post(details::post_assemble_epub))
+        .route("/:id/download", get(download::serve_export))
 }

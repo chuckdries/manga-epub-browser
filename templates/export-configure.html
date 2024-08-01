@@ -52,24 +52,7 @@
       <h2 class="title is-5">Included chapters</h2>
       <a aria-disabled="true" href="/export/{{ export.id }}/select-chapters" class="button is-disabled">Edit chapters</a>
     </div>
-    <table class="table is-fullwidth">
-      <thead>
-        <tr>
-          <th>id</th>
-          <th>Chapter Number</th>
-          <th>Title</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for chapter in chapters %}
-        <tr>
-          <td>{{ chapter.id }}</td>
-          <td>{{ chapter.chapter_number }}</td>
-          <td>{{ chapter.name }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+    {{ chapter_table|safe }}
   </div>
   </div>
 
