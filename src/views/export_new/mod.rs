@@ -5,7 +5,7 @@ mod manga_select;
 
 #[axum::debug_handler]
 async fn redirect_to_manga_select() -> axum::response::Redirect {
-    axum::response::Redirect::to("/book/new/select-manga")
+    axum::response::Redirect::to("/export/new/select-manga")
 }
 
 pub fn get_routes() -> axum::Router {

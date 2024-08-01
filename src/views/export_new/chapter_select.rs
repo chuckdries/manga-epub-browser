@@ -1,6 +1,6 @@
 use std::{collections::HashSet, sync::Arc};
 
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use askama::Template;
 use axum::{extract::Query, response::Redirect, Extension};
 use axum_extra::extract::Form;
@@ -8,7 +8,7 @@ use serde::Deserialize;
 use sqlx::SqlitePool;
 
 use crate::{
-    ebook,
+    services::export::{create_export, set_chapters_for_export},
     suwayomi::{self, specific_manga_chapters::SpecificMangaChaptersMangaChaptersNodes},
     AppError,
 };
@@ -23,7 +23,7 @@ pub struct ChapterSelect {
 
 #[derive(Deserialize)]
 pub struct ChapterSelectParams {
-    mangaId: i64,
+    manga_id: i64,
     hide_read: Option<bool>,
 }
 
@@ -31,7 +31,7 @@ pub struct ChapterSelectParams {
 pub async fn view_chapter_select(
     Query(params): Query<ChapterSelectParams>,
 ) -> Result<ChapterSelect, AppError> {
-    let manga_id = params.mangaId;
+    let manga_id = params.manga_id;
     let all_chapters = suwayomi::get_chapters_by_manga_id(manga_id).await?;
     let (chapters, hide_read) = match params.hide_read {
         Some(true) => (
@@ -63,13 +63,8 @@ pub async fn post_chapter_select(
 ) -> Result<Redirect, AppError> {
     let manga = suwayomi::get_manga_by_id(params.manga_id).await?;
     let author = manga.author.unwrap_or("Unknown".to_string());
-    let book_id = ebook::commit_chapter_selection(
-        &*pool,
-        params.chapter_id,
-        params.manga_id,
-        &manga.title,
-        &author,
-    )
-    .await?;
-    Ok(Redirect::to(&format!("/book/{}/configure", book_id)))
+
+    let export = create_export(&*pool, &manga.title, &author).await?;
+    set_chapters_for_export(&pool, export, params.chapter_id).await?;
+    Ok(Redirect::to(&format!("/export/{}/configure", export)))
 }

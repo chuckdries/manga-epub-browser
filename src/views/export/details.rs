@@ -13,7 +13,7 @@ use crate::{
 };
 
 #[derive(Template)]
-#[template(path = "book-details.html")]
+#[template(path = "export-details.html")]
 pub struct BookDetailsTemplate {
     book: Book,
     chapters: Vec<ChaptersByIdsChaptersNodes>,

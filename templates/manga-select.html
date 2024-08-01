@@ -1,16 +1,8 @@
 {% extends "base.html" %} {% block head %}
 <link rel="stylesheet" href="/public/better-chapter-select.css" />
 {% endblock %} {% block content %}
-<!-- <div class="section">
-  <h1 class="title">1. Select source manga</h1>
-</div>
-<div class="section">
-  <h2 class="title">2. Select chapter range</h2>
-</div>
-<div class="section">
-  <h2 class="title">3. Configure book</h2>
-</div> -->
-<form class="section" action="/book/new/select-chapters" method="get">
+
+<form class="section" action="/export/new/select-chapters" method="get">
   <div
     class="is-flex is-justify-content-space-between is-align-items-center"
   >
@@ -37,7 +29,7 @@
           <input
             id="manga-{{ manga.id }}"
             type="radio"
-            name="mangaId"
+            name="manga_id"
             value="{{ manga.id }}"
           />
         </td>

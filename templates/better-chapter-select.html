@@ -1,7 +1,7 @@
 {% extends "base.html" %} {% block head %}
 <link rel="stylesheet" href="/public/better-chapter-select.css" />
 {% endblock %} {% block content %}
-<form class="section" action="/book/new/select-chapters" method="post">
+<form class="section" action="/export/new/select-chapters" method="post">
   <input type="hidden" name="manga_id" value="{{ manga_id }}">
   <div class="is-flex is-justify-content-space-between is-align-items-center">
     <div>
@@ -12,9 +12,9 @@
     </div>
     <div>
       {% if hide_read %}
-      <a class="button" href="/book/new/select-chapters?mangaId={{ manga_id }}&hide_read=false">Show read</a>
+      <a class="button" href="/export/new/select-chapters?manga_id={{ manga_id }}&hide_read=false">Show read</a>
       {% else %}
-      <a class="button" href="/book/new/select-chapters?mangaId={{ manga_id }}&hide_read=true">Hide read</a>
+      <a class="button" href="/export/new/select-chapters?manga_id={{ manga_id }}&hide_read=true">Hide read</a>
       {% endif %}
       <button class="button is-link" type="submit">Next</button>
     </div>
@@ -34,7 +34,7 @@
         <td>
           <div class="fake-check"></div>
           <input style="visibility: hidden" type="checkbox" name="chapter_id" value="{{ chapter.id }}"
-            alt="inlcude chapter {{chapter.name}} in book" />
+            alt="inlcude chapter {{chapter.name}} in export" />
         </td>
         <td>{{ chapter.name }}</td>
         <td>{% if let Some(scanlator) = chapter.scanlator %}{{ scanlator }}{% endif %}</td>

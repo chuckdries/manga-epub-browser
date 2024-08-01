@@ -1,0 +1,77 @@
+{% extends "base.html" %} {% block head %}
+<!-- <link rel="stylesheet" href="/public/better-chapter-select.css" /> -->
+{% endblock %} {% block content %}
+<form action="/export/{{ export.id }}/configure" method="post">
+  <div class="section">
+    <div class="is-flex is-justify-content-space-between is-align-items-center">
+      <div>
+        <h1 class="title is-4">3. Configure and compile</h1>
+        <p class="subtitle">
+          Customize metadata and confirm chapter selection is correct before beginning the export job.
+        </p>
+      </div>
+      <div class="is-flex is-gap-1">
+        <button class="button" type="submit" name="action" value="save">
+          Save Draft
+        </button>
+        <button class="button is-link" type="submit" name="action" value="compile">
+          Export
+        </button>
+      </div>
+    </div>
+  </div>
+  <div class="section">
+    <div class="field">
+      <h2 class="title is-5">Configure export</h2>
+      <label class="label">Title</label>
+      <div class="control">
+        <input class="input" type="text" name="title" value="{{ export.title }}" required />
+      </div>
+    </div>
+    <div class="field">
+      <label class="label">Author</label>
+      <div class="control">
+        <input class="input" type="text" name="author" value="{{ export.author }}" required />
+      </div>
+    </div>
+    <div class="field">
+      <label class="label">Format</label>
+      <div class="select">
+        <select name="format">
+          <option value="Epub" {%if export.format==crate::services::export::ExportFormat::Epub %}selected{% endif %}>
+            EPUB</option>
+          <option value="Cbz" {%if export.format==crate::services::export::ExportFormat::Cbz %}selected{% endif %}>CBZ
+          </option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="is-flex is-justify-content-space-between">
+      <h2 class="title is-5">Included chapters</h2>
+      <a aria-disabled="true" href="/export/{{ export.id }}/select-chapters" class="button is-disabled">Edit chapters</a>
+    </div>
+    <table class="table is-fullwidth">
+      <thead>
+        <tr>
+          <th>id</th>
+          <th>Chapter Number</th>
+          <th>Title</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for chapter in chapters %}
+        <tr>
+          <td>{{ chapter.id }}</td>
+          <td>{{ chapter.chapter_number }}</td>
+          <td>{{ chapter.name }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  </div>
+
+</form>
+{% endblock %}

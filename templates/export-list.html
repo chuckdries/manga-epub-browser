@@ -1,0 +1,38 @@
+{% extends "base.html" %} {% block title %}Exports{% endblock %}
+<!-- asdf -->
+{% block content %}
+<div class="section">
+    <div class="is-flex is-justify-content-space-between is-gap-2 is-align-items-center">
+        <h1 class="title my-0">Exports</h1>
+        <a href="/export/new" class="button is-link">New Export</a>
+    </div>
+    <table class="table is-fullwidth">
+        <thead>
+            <tr>
+                <th>id</th>
+                <th>Title</th>
+                <th>Author</th>
+                <th>Status</th>
+                <th></th>
+            </tr>
+        </thead>
+        {% for export in exports %}
+        <tr>
+            <td>{{ export.id }}</td>
+            <td>{{ export.title }}</td>
+            <td>{{ export.author }}</td>
+            <td>{{ export.step }}</td>
+            <td>
+                {% if export.state != crate::services::export::ExportState::Draft %}
+                <a class="button is-small" href="/export/{{export.id}}">View</a>
+                {% else %}
+                <a class="button is-small is-link" href="/export/{{export.id}}/configure">
+                    Configure
+                </a>
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
+</div>
+{% endblock %}

@@ -97,24 +97,8 @@ const SESSION_SELECTED_CHAPTERS_KEY: &str = "selected_chapters";
 #[derive(Default, Deserialize, Serialize)]
 struct SessionSelectedChapters(HashMap<usize, HashSet<i64>>);
 
-fn concat_chapter_ids(
-    session_selected: HashMap<usize, HashSet<i64>>,
-    current_selection: HashSet<i64>,
-    current_page: usize,
-) -> HashSet<i64> {
-    let mut all_selected: HashSet<i64> = HashSet::new();
-    for page in session_selected.keys() {
-        if *page != current_page {
-            let page_selected = session_selected.get(page).unwrap();
-            all_selected.extend(page_selected)
-        }
-    }
-    all_selected.extend(current_selection);
-    all_selected
-}
-
 #[derive(Template)]
-#[template(path = "home.html", print = "code")]
+#[template(path = "home.html")]
 struct HomeTemplate {
     sources: Vec<suwayomi::all_sources_by_language::AllSourcesByLanguageSourcesNodes>,
     library: Vec<suwayomi::get_library::GetLibraryMangasNodes>,
@@ -161,10 +145,10 @@ async fn main() {
         .with_expiry(Expiry::OnInactivity(Duration::days(14)));
 
     let app = Router::new()
-        .route("/", get(Redirect::to("/books")))
-        .nest("/book/new", views::book_new::get_routes())
-        .nest("/book", views::book::get_routes())
-        .nest("/books", views::books::get_routes())
+        .route("/", get(Redirect::to("/exports")))
+        .nest("/export/new", views::export_new::get_routes())
+        .nest("/export", views::export::get_routes())
+        .nest("/exports", views::exports::get_routes())
         .nest_service("/public", ServeDir::new("public"))
         .fallback(not_found)
         .layer(Extension(pool_clone.clone()))

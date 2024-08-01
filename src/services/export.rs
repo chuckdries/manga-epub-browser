@@ -1,7 +1,7 @@
-use std::fmt;
+use std::{collections::HashSet, fmt};
 
 use serde::{Deserialize, Serialize};
-use sqlx::SqlitePool;
+use sqlx::{error::ErrorKind, SqlitePool};
 use time::OffsetDateTime;
 
 use crate::AppError;
@@ -46,14 +46,14 @@ pub enum ExportFormat {
 
 #[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
 pub struct Export {
-    id: i64,
-    title: String,
-    author: String,
-    format: ExportFormat,
-    state: ExportState,
-    step: ExportStep,
-    progress: i64,
-    created_at: OffsetDateTime,
+    pub id: i64,
+    pub title: String,
+    pub author: String,
+    pub format: ExportFormat,
+    pub state: ExportState,
+    pub step: ExportStep,
+    pub progress: i64,
+    pub created_at: OffsetDateTime,
 }
 
 pub async fn get_export_by_id(pool: &SqlitePool, id: i64) -> Result<Option<Export>, AppError> {
@@ -77,7 +77,11 @@ pub async fn get_export_by_id(pool: &SqlitePool, id: i64) -> Result<Option<Expor
     Ok(export)
 }
 
-pub async fn create_export(pool: &SqlitePool, title: &str, author: &str) -> Result<i64, AppError> {
+pub async fn insert_export(
+    pool: &SqlitePool,
+    title: &str,
+    author: &str
+) -> Result<i64, sqlx::Error> {
     let now = OffsetDateTime::now_utc();
     let id = sqlx::query!(
         r#"
@@ -96,7 +100,59 @@ pub async fn create_export(pool: &SqlitePool, title: &str, author: &str) -> Resu
     .fetch_one(pool)
     .await?
     .id;
+    
     Ok(id)
+}
+
+pub async fn create_export(pool: &SqlitePool, title: &str, author: &str) -> Result<i64, sqlx::Error> {
+    let id = match insert_export(pool, title, author).await {
+        Ok(id) => Ok(id),
+        Err(sqlx::Error::Database(e)) => {
+            match e.kind() {
+                ErrorKind::UniqueViolation => {
+                    let new_title = format!("{} ({})", title, OffsetDateTime::now_utc());
+                    Ok(insert_export(pool, &new_title, author).await?)
+                }
+                _ => Err(sqlx::Error::Database(e)),
+            }
+        },
+        Err(e) => Err(e),
+    }?;
+
+    Ok(id)
+}
+
+pub async fn set_chapters_for_export(
+    pool: &SqlitePool,
+    export_id: i64,
+    chapter_ids: HashSet<i64>,
+) -> Result<(), AppError> {
+    let mut tx = pool.begin().await?;
+    sqlx::query!(
+        r#"
+        DELETE FROM ExportChapters
+        WHERE export_id = ?
+        "#,
+        export_id
+    )
+    .execute(&mut *tx)
+    .await?;
+
+    for chapter_id in chapter_ids {
+        sqlx::query!(
+            r#"
+            INSERT INTO ExportChapters (export_id, chapter_id)
+            VALUES (?, ?)
+            "#,
+            export_id,
+            chapter_id
+        )
+        .execute(&mut *tx)
+        .await?;
+    }
+
+    tx.commit().await?;
+    Ok(())
 }
 
 pub async fn set_export_config(
@@ -141,11 +197,7 @@ pub async fn set_export_state(
     Ok(())
 }
 
-pub async fn set_export_step(
-    pool: &SqlitePool,
-    id: i64,
-    step: ExportStep,
-) -> Result<(), AppError> {
+pub async fn set_export_step(pool: &SqlitePool, id: i64, step: ExportStep) -> Result<(), AppError> {
     sqlx::query!(
         r#"
         UPDATE Export
@@ -177,4 +229,49 @@ pub async fn set_export_progress(
     .execute(pool)
     .await?;
     Ok(())
+}
+
+pub async fn get_export_and_chapters_by_id(
+    pool: &SqlitePool,
+    id: i64,
+) -> Result<Option<(Export, HashSet<i64>)>, AppError> {
+    let export = get_export_by_id(pool, id).await?;
+    let chapters: HashSet<i64> = sqlx::query!(
+        r#"
+        SELECT chapter_id
+        FROM ExportChapters
+        WHERE export_id = ?
+        "#,
+        id
+    )
+    .fetch_all(pool)
+    .await?
+    .into_iter()
+    .map(|row| row.chapter_id)
+    .filter_map(|chapter_id| chapter_id)
+    .collect();
+
+    Ok(export.map(|export| (export, chapters)))
+}
+
+pub async fn get_export_list(pool: &SqlitePool) -> Result<Vec<Export>, AppError> {
+    let exports = sqlx::query_as!(
+        Export,
+        r#"
+        SELECT 
+            id,
+            title,
+            author,
+            format as "format: ExportFormat",
+            state as "state: ExportState",
+            step as "step: ExportStep",
+            progress,
+            created_at as "created_at: OffsetDateTime"
+        FROM Export
+        ORDER BY created_at DESC
+        "#
+    )
+    .fetch_all(pool)
+    .await?;
+    Ok(exports)
 }
