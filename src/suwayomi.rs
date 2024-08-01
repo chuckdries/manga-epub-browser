@@ -1,18 +1,17 @@
+use std::fs;
 use std::io::{copy, Cursor};
+use std::path::{Path, PathBuf};
 use std::{collections::HashSet, env};
 
-use anyhow::{anyhow, Error, Result};
+use anyhow::{Error, Result};
 use eyre::eyre;
 use graphql_client::{reqwest::post_graphql, GraphQLQuery};
-use sqlx::SqlitePool;
 use tokio::time::{sleep, Duration};
 
 use futures::future::join_all;
-use futures::prelude::*;
 use regex::Regex;
 
 use crate::{
-    ebook::{update_book_status, BookStatus},
     suwayomi::check_on_download_progress::DownloaderState,
     util::join_url,
     AppError,
@@ -173,8 +172,6 @@ pub struct CheckOnDownloadProgress;
 
 pub async fn download_chapters_from_source(
     ids: &HashSet<i64>,
-    book_id: i64,
-    pool: &SqlitePool,
 ) -> Result<(), AppError> {
     let client = reqwest::Client::new();
 
@@ -245,15 +242,14 @@ pub async fn download_chapters_from_source(
     Ok(())
 }
 
-async fn dl_img(url: &str, dl_dirname: &str) -> Result<(), AppError> {
+async fn dl_img(url: &str, dl_dir: &PathBuf) -> Result<(), AppError> {
     // let client = reqwest::Client::new();
     let re = Regex::new(r"/api/v1/manga/\d+/chapter/\d+/page/(\d+)").unwrap();
     let Some(caps) = re.captures(url) else {
         return Err(eyre!("Couldn't parse image url").into());
     };
-    let dl_prefix = &env::var("CHAPTER_DL_PATH").unwrap_or("data/chapters".to_string());
-    let dl_dir = format!("{}/{}", dl_prefix, dl_dirname);
-    std::fs::create_dir_all(&dl_dir)?;
+    
+    std::fs::create_dir_all(dl_dir)?;
     let response = reqwest::get(join_url(&env::var("SUWAYOMI_URL")?, url)?).await?;
     let content_type = response
         .headers()
@@ -268,7 +264,7 @@ async fn dl_img(url: &str, dl_dirname: &str) -> Result<(), AppError> {
         Some(ext) => ext,
         None => return Err(eyre!("Couldn't parse image extension").into()),
     };
-    let mut file = match std::fs::File::create(format!("{}/{}.{}", &dl_dir, &caps[1], &extension)) {
+    let mut file = match std::fs::File::create(dl_dir.join(format!("{}.{}", &caps[1], &extension))) {
         Ok(f) => f,
         Err(e) => {
             println!("Couldn't create file: {:?}", e);
@@ -282,7 +278,6 @@ async fn dl_img(url: &str, dl_dirname: &str) -> Result<(), AppError> {
 
 pub async fn fetch_chapters_from_suwayomi(
     ids: &HashSet<i64>,
-    book_id: i64,
 ) -> Result<(), AppError> {
     join_all(ids.iter().map(|id| fetch_chapter(*id))).await;
     Ok(())
@@ -298,6 +293,8 @@ pub struct FetchChapterPages;
 pub async fn fetch_chapter(chapter: i64) -> Result<(), AppError> {
     let client = reqwest::Client::new();
     let dl_dirname = format!("{}", chapter);
+    let dl_prefix = &env::var("CHAPTER_DL_PATH").unwrap_or("data/chapters".to_string());
+    let dl_dir = Path::new(dl_prefix).join(&dl_dirname);
 
     println!("Fetching chapter {}", chapter);
 
@@ -313,11 +310,17 @@ pub async fn fetch_chapter(chapter: i64) -> Result<(), AppError> {
         None => vec![],
     };
 
-    join_all(urls.iter().map(|img| dl_img(img, &dl_dirname)))
+    if fs::read_dir(&dl_dir).is_ok_and(|r| r.count() == urls.len()) {
+        println!("Chapter {} already downloaded", chapter);
+        return Ok(());
+    }
+
+    join_all(urls.iter().map(|img| dl_img(img, &dl_dir)))
         .await
         .iter()
         .filter(|r| r.is_err())
         .for_each(|r| {
+            // TODO: log error in db
             println!("Error fetching page: {:?}", r);
         });
     Ok(())

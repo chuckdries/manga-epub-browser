@@ -242,7 +242,7 @@ async fn perform_step(
                 Some(book_and_chapters) => book_and_chapters,
                 None => return Err(eyre!("Book not found").into()),
             };
-            download_chapters_from_source(&book_and_chapters.chapters, task.book_id, &pool).await?;
+            download_chapters_from_source(&book_and_chapters.chapters).await?;
             task.current_step = CompileTaskStep::FetchingFromSuwayomi;
         }
         CompileTaskStep::FetchingFromSuwayomi => {
@@ -250,7 +250,7 @@ async fn perform_step(
                 Some(book_and_chapters) => book_and_chapters,
                 None => return Err(eyre!("Book not found").into()),
             };
-            fetch_chapters_from_suwayomi(&book_and_chapters.chapters, task.book_id).await?;
+            fetch_chapters_from_suwayomi(&book_and_chapters.chapters).await?;
         }
         CompileTaskStep::AssemblingFile => {
             let book_and_chapters = match get_book_with_chapters_by_id(pool, task.book_id).await? {

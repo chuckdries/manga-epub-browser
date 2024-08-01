@@ -3,12 +3,13 @@ TODO
 - [-] implement stitching chapters into epub file
 - [ ] better error handling (correct codes, better types?)
 - [-] resume interrupted download/compilation
-    - [ ] skip downloading existing images from suwayomi? or just whole chapters?
+    - [x] skip downloading whole chapters that are already dl'd
     - [-] job system?
         - [ ] book status from tasks table
         - [ ] task logs in book details page
-- [ ] epub file name collision handling?
-- [ ] epub download page
+- [ ] export file name collision handling?
+- [ ] export download page
+- [ ] export to cbz
 - [ ] display download progress
 - [ ] display book job progress
 - [ ] resize images
