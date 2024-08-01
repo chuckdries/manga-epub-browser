@@ -1,3 +1,4 @@
+use chrono::{DateTime, Local};
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
 use time::{format_description::well_known::Rfc3339, OffsetDateTime};
@@ -12,7 +13,7 @@ pub struct ExportLog {
     export_id: i64,
     step: ExportStep,
     message: String,
-    timestamp: OffsetDateTime,
+    timestamp: DateTime<Local>,
 }
 
 impl std::fmt::Display for ExportLog {
@@ -31,11 +32,10 @@ pub async fn log_export_step(
     step: ExportStep,
     message: &str,
 ) -> Result<(), AppError> {
-    let now = OffsetDateTime::now_utc();
-    let now_formatted = now.format(&Rfc3339).unwrap_or(now.to_string());
+    let now = chrono::Local::now().to_rfc3339();
     println!(
         "[{}] export {}, step {}, message {}",
-        now_formatted, export_id, step, message
+        now, export_id, step, message
     );
     sqlx::query!(
         "INSERT INTO ExportLogs (export_id, step, message, timestamp) VALUES (?, ?, ?, ?)",

@@ -356,6 +356,7 @@ dependencies = [
  "iana-time-zone",
  "js-sys",
  "num-traits",
+ "serde",
  "wasm-bindgen",
  "windows-targets 0.52.0",
 ]
@@ -1292,6 +1293,7 @@ dependencies = [
  "askama_axum",
  "axum",
  "axum-extra",
+ "chrono",
  "dotenv",
  "epub-builder",
  "eyre",

@@ -1,5 +1,6 @@
 use std::{collections::HashSet, fmt};
 
+use chrono::{DateTime, Local, NaiveDateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::{error::ErrorKind, SqlitePool};
 use time::OffsetDateTime;
@@ -53,7 +54,7 @@ pub struct Export {
     pub state: ExportState,
     pub step: ExportStep,
     pub progress: i64,
-    pub created_at: OffsetDateTime,
+    pub created_at: NaiveDateTime,
 }
 
 pub async fn get_export_by_id(pool: &SqlitePool, id: i64) -> Result<Option<Export>, AppError> {
@@ -68,7 +69,7 @@ pub async fn get_export_by_id(pool: &SqlitePool, id: i64) -> Result<Option<Expor
             state as "state: ExportState",
             step as "step: ExportStep",
             progress,
-            created_at as "created_at: OffsetDateTime"
+            created_at as "created_at: NaiveDateTime"
         FROM Export WHERE Export.id = ?"#,
         id
     )
@@ -82,7 +83,7 @@ pub async fn insert_export(
     title: &str,
     author: &str
 ) -> Result<i64, sqlx::Error> {
-    let now = OffsetDateTime::now_utc();
+    let now = chrono::Local::now().to_rfc3339();
     let id = sqlx::query!(
         r#"
         INSERT INTO Export (title, author, format, state, step, progress, created_at)
