@@ -2,12 +2,12 @@ use std::{collections::HashSet, fmt};
 
 use askama::Result;
 use serde::Serialize;
-use sqlx::{Acquire, SqlitePool};
+use sqlx::SqlitePool;
 
 use crate::AppError;
 
 pub async fn commit_chapter_selection(
-    pool: SqlitePool,
+    pool: &SqlitePool,
     chapters: HashSet<i64>,
     manga_id: i64,
     default_title: &str,
@@ -23,7 +23,7 @@ pub async fn commit_chapter_selection(
         default_author,
         1
     )
-    .execute(&pool)
+    .execute(pool)
     .await?
     .last_insert_rowid();
 

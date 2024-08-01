@@ -16,5 +16,4 @@ pub fn get_routes() -> axum::Router {
             "/select-chapters",
             get(chapter_select::view_chapter_select).post(chapter_select::post_chapter_select),
         )
-
 }

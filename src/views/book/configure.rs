@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use anyhow::anyhow;
 use askama::Template;
 use askama_axum::IntoResponse;
@@ -30,7 +32,7 @@ pub struct BookConfigure {
 
 #[axum::debug_handler]
 pub async fn view_configure_book(
-    Extension(pool): Extension<SqlitePool>,
+    Extension(pool): Extension<Arc<SqlitePool>>,
     params: Path<i64>,
 ) -> Result<Response, AppError> {
     let book_id = params.0;
@@ -60,7 +62,7 @@ pub struct ConfigureBookInput {
 }
 
 pub async fn post_configure_book(
-    Extension(pool): Extension<SqlitePool>,
+    Extension(pool): Extension<Arc<SqlitePool>>,
     Path(id): Path<i64>,
     Form(data): Form<ConfigureBookInput>,
 ) -> Result<Response, AppError> {

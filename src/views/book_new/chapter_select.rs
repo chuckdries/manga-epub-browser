@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::{collections::HashSet, sync::Arc};
 
 use anyhow::{anyhow, Result};
 use askama::Template;
@@ -58,13 +58,13 @@ pub struct ChapterSelectSubmission {
 
 #[axum::debug_handler]
 pub async fn post_chapter_select(
-    Extension(pool): Extension<SqlitePool>,
+    Extension(pool): Extension<Arc<SqlitePool>>,
     Form(params): Form<ChapterSelectSubmission>,
 ) -> Result<Redirect, AppError> {
     let manga = suwayomi::get_manga_by_id(params.manga_id).await?;
     let author = manga.author.unwrap_or("Unknown".to_string());
     let book_id = ebook::commit_chapter_selection(
-        pool,
+        &*pool,
         params.chapter_id,
         params.manga_id,
         &manga.title,

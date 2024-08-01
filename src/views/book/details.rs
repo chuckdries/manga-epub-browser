@@ -1,14 +1,15 @@
-use anyhow::anyhow;
+use std::sync::Arc;
+
 use askama::Template;
 use axum::{debug_handler, extract::Path, Extension};
 use eyre::eyre;
 use sqlx::SqlitePool;
 
 use crate::{
-    ebook::{get_book_with_chapters_by_id, Book}, services::book_compiler::assemble_epub, suwayomi::{
-        chapters_by_ids::ChaptersByIdsChaptersNodes,
-        get_chapters_by_ids,
-    }, AppError
+    ebook::{get_book_with_chapters_by_id, Book},
+    services::book_compiler::assemble_epub,
+    suwayomi::{chapters_by_ids::ChaptersByIdsChaptersNodes, get_chapters_by_ids},
+    AppError,
 };
 
 #[derive(Template)]
@@ -18,9 +19,11 @@ pub struct BookDetailsTemplate {
     chapters: Vec<ChaptersByIdsChaptersNodes>,
 }
 
+// TODO task log
+// TODO status from tasks table
 #[debug_handler]
 pub async fn view_book_details(
-    Extension(pool): Extension<SqlitePool>,
+    Extension(pool): Extension<Arc<SqlitePool>>,
     Path(id): Path<i64>,
 ) -> Result<BookDetailsTemplate, AppError> {
     let book = match get_book_with_chapters_by_id(&pool, id).await? {
@@ -41,7 +44,7 @@ pub async fn view_book_details(
 }
 
 pub async fn post_assemble_epub(
-    Extension(pool): Extension<SqlitePool>,
+    Extension(pool): Extension<Arc<SqlitePool>>,
     Path(id): Path<i64>,
 ) -> Result<(), AppError> {
     let book_with_chapters = match get_book_with_chapters_by_id(&pool, id).await? {

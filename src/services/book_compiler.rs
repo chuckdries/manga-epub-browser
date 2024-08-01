@@ -4,49 +4,266 @@ use std::{
     fs::{self, File},
     io::Cursor,
     path::Path,
+    sync::Arc,
 };
 
-use anyhow::{anyhow, Error};
 use epub_builder::{EpubBuilder, EpubContent, ZipLibrary};
 use eyre::eyre;
-use sqlx::{any, SqlitePool};
+use serde::{Deserialize, Serialize};
+use sqlx::SqlitePool;
+use time::OffsetDateTime;
 
 use crate::{
-    ebook::{get_book_with_chapters_by_id, update_book_status, Book, BookStatus},
-    suwayomi::{
-        download_chapters_from_source, fetch_chapter, fetch_chapters_from_suwayomi,
-        get_chapters_by_ids,
-    },
+    ebook::{get_book_with_chapters_by_id, Book},
+    suwayomi::{download_chapters_from_source, fetch_chapters_from_suwayomi, get_chapters_by_ids},
     AppError,
 };
 
-pub async fn begin_compile_book(pool: SqlitePool, book_id: i64) -> Result<(), AppError> {
+use super::task_log::log_task_step;
+
+#[derive(Debug, Serialize, Deserialize, sqlx::Type, Clone, Copy, PartialEq)]
+#[sqlx(rename_all = "snake_case")]
+pub enum CompileTaskStep {
+    Initialize,
+    DownloadingFromSource,
+    FetchingFromSuwayomi,
+    AssemblingFile,
+    Complete,
+}
+
+#[derive(Debug, Serialize, Deserialize, sqlx::Type, PartialEq)]
+#[sqlx(rename_all = "snake_case")]
+pub enum TaskState {
+    Pending,
+    InProgress,
+    Completed,
+    Failed,
+}
+
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
+pub struct CompileTask {
+    id: i64,
+    state: TaskState,
+    progress: i64,
+    current_step: CompileTaskStep,
+    date_created: OffsetDateTime,
+    book_id: i64,
+}
+
+impl std::fmt::Display for CompileTaskStep {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            CompileTaskStep::Initialize => write!(f, "Initialize"),
+            CompileTaskStep::DownloadingFromSource => write!(f, "Downloading from source"),
+            CompileTaskStep::FetchingFromSuwayomi => write!(f, "Fetching from Suwayomi"),
+            CompileTaskStep::AssemblingFile => write!(f, "Assembling file"),
+            CompileTaskStep::Complete => write!(f, "Complete"),
+        }
+    }
+}
+
+impl From<std::string::String> for CompileTaskStep {
+    fn from(text: std::string::String) -> Self {
+        match text.as_str() {
+            "initialize" => CompileTaskStep::Initialize,
+            "downloading_from_source" => CompileTaskStep::DownloadingFromSource,
+            "fetching_from_suwayomi" => CompileTaskStep::FetchingFromSuwayomi,
+            "assembling_file" => CompileTaskStep::AssemblingFile,
+            "complete" => CompileTaskStep::Complete,
+            _ => panic!("Invalid CompileTaskStep"),
+        }
+    }
+}
+
+pub async fn begin_compile_book(pool: Arc<SqlitePool>, book_id: i64) -> Result<(), AppError> {
     tokio::spawn(async move {
-        match compile_book(&pool, book_id).await {
-            Ok(_) => (),
+        let id = match create_task(pool.clone(), book_id).await {
+            Ok(id) => id,
             Err(e) => {
-                update_book_status(&pool, book_id, BookStatus::Failed).await;
-                eprintln!("Error compiling book: {:?}", e)
+                log_task_step(
+                    &*pool,
+                    0,
+                    CompileTaskStep::Initialize,
+                    &format!("Failed to create task: {:#?}", e),
+                )
+                .await
+                .unwrap();
+                return;
             }
         };
+        execute_task(pool, id).await;
     });
 
     Ok(())
 }
 
-async fn compile_book(pool: &SqlitePool, book_id: i64) -> Result<(), AppError> {
-    update_book_status(&pool, book_id, BookStatus::DownloadingFromSource).await?;
-    println!("Downloading chapters from source");
-    let book_and_chapters = match get_book_with_chapters_by_id(pool, book_id).await? {
-        Some(book_and_chapters) => book_and_chapters,
-        None => return Err(eyre!("Book not found").into()),
+pub async fn resume_interrupted_tasks(pool: Arc<SqlitePool>) -> Result<(), AppError> {
+    let tasks = sqlx::query_as!(
+        CompileTask,
+        r#"SELECT 
+            id,
+            state as "state: TaskState",
+            progress,
+            book_id,
+            current_step as "current_step: CompileTaskStep",
+            date_created as "date_created: OffsetDateTime"
+            FROM CompileTasks WHERE state = ? OR state = ?"#,
+        TaskState::InProgress,
+        TaskState::Pending
+    )
+    .fetch_all(&*pool)
+    .await?;
+
+    for task in tasks {
+        let pool_clone = pool.clone();
+        log_task_step(
+            &*pool_clone,
+            task.id,
+            task.current_step,
+            "Resuming task",
+        )
+        .await
+        .unwrap();
+        tokio::spawn(async move {
+            execute_task(pool_clone, task.id).await;
+        });
+    }
+
+    Ok(())
+}
+
+async fn update_task_state(pool: &SqlitePool, task: &CompileTask) -> Result<(), sqlx::Error> {
+    sqlx::query!(
+        "UPDATE CompileTasks SET state = ?, progress = ?, current_step = ? WHERE id = ?",
+        task.state,
+        task.progress,
+        task.current_step,
+        task.id
+    )
+    .execute(pool)
+    .await?;
+
+    Ok(())
+}
+
+async fn create_task(pool: Arc<SqlitePool>, book_id: i64) -> Result<i64, AppError> {
+    let now = OffsetDateTime::now_utc();
+    let task = sqlx::query!(
+        "INSERT INTO CompileTasks (state, progress, current_step, date_created, book_id) VALUES (?, ?, ?, ?, ?)",
+        TaskState::Pending,
+        0,
+        CompileTaskStep::Initialize,
+        now,
+        book_id
+    )
+    .execute(&*pool)
+    .await?;
+
+    Ok(task.last_insert_rowid())
+}
+
+async fn execute_task(pool: Arc<SqlitePool>, id: i64) {
+    let mut task = match sqlx::query_as!(
+        CompileTask,
+        r#"SELECT 
+            id,
+            state as "state: TaskState",
+            progress,
+            book_id,
+            current_step as "current_step: CompileTaskStep",
+            date_created as "date_created: OffsetDateTime"
+            FROM CompileTasks WHERE id = ?"#,
+        id
+    )
+    .fetch_one(&*pool)
+    .await
+    .ok()
+    {
+        Some(task) => task,
+        None => return,
     };
-    download_chapters_from_source(&book_and_chapters.chapters, book_id, &pool).await?;
-    update_book_status(&pool, book_id, BookStatus::DownloadingFromSuwayomi).await?;
-    println!("Downloading chapters from Suwayomi");
-    fetch_chapters_from_suwayomi(&book_and_chapters.chapters, book_id).await?;
-    update_book_status(&pool, book_id, BookStatus::Assembling).await?;
-    println!("Assembling book");
+
+    if task.state == TaskState::Completed {
+        return;
+    }
+
+    task.state = TaskState::InProgress;
+    update_task_state(&*pool, &task).await.unwrap();
+
+    let steps = [
+        CompileTaskStep::Initialize,
+        CompileTaskStep::DownloadingFromSource,
+        CompileTaskStep::FetchingFromSuwayomi,
+        CompileTaskStep::AssemblingFile,
+        CompileTaskStep::Complete,
+    ];
+
+    for step in steps.iter().skip(
+        steps
+            .iter()
+            .position(|&s| s == task.current_step)
+            .unwrap_or(0),
+    ) {
+        task.current_step = *step;
+        update_task_state(&*pool, &task).await.unwrap();
+
+        log_task_step(&*pool, task.id, *step, "Starting step")
+            .await
+            .unwrap();
+
+        if let Err(e) = perform_step(&*pool, *step, &mut task).await {
+            task.state = TaskState::Failed;
+            update_task_state(&*pool, &task).await.unwrap();
+            log_task_step(&*pool, task.id, *step, &format!("Step failed: {:#?}", e))
+                .await
+                .unwrap();
+            return;
+        }
+
+        update_task_state(&*pool, &task).await.unwrap();
+
+        log_task_step(&*pool, task.id, *step, "Step completed")
+            .await
+            .unwrap();
+    }
+}
+
+async fn perform_step(
+    pool: &SqlitePool,
+    step: CompileTaskStep,
+    task: &mut CompileTask,
+) -> Result<(), AppError> {
+    match step {
+        CompileTaskStep::Initialize => {
+            task.current_step = CompileTaskStep::DownloadingFromSource;
+        }
+        CompileTaskStep::DownloadingFromSource => {
+            let book_and_chapters = match get_book_with_chapters_by_id(pool, task.book_id).await? {
+                Some(book_and_chapters) => book_and_chapters,
+                None => return Err(eyre!("Book not found").into()),
+            };
+            download_chapters_from_source(&book_and_chapters.chapters, task.book_id, &pool).await?;
+            task.current_step = CompileTaskStep::FetchingFromSuwayomi;
+        }
+        CompileTaskStep::FetchingFromSuwayomi => {
+            let book_and_chapters = match get_book_with_chapters_by_id(pool, task.book_id).await? {
+                Some(book_and_chapters) => book_and_chapters,
+                None => return Err(eyre!("Book not found").into()),
+            };
+            fetch_chapters_from_suwayomi(&book_and_chapters.chapters, task.book_id).await?;
+        }
+        CompileTaskStep::AssemblingFile => {
+            let book_and_chapters = match get_book_with_chapters_by_id(pool, task.book_id).await? {
+                Some(book_and_chapters) => book_and_chapters,
+                None => return Err(eyre!("Book not found").into()),
+            };
+            assemble_epub(book_and_chapters.book, &book_and_chapters.chapters).await?;
+            task.current_step = CompileTaskStep::Complete;
+        }
+        CompileTaskStep::Complete => {
+            task.state = TaskState::Completed;
+        }
+    }
     Ok(())
 }
 
