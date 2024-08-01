@@ -54,7 +54,7 @@ pub struct Export {
     pub state: ExportState,
     pub step: ExportStep,
     pub progress: i64,
-    pub created_at: NaiveDateTime,
+    pub created_at: OffsetDateTime,
 }
 
 pub async fn get_export_by_id(pool: &SqlitePool, id: i64) -> Result<Option<Export>, AppError> {
@@ -69,7 +69,7 @@ pub async fn get_export_by_id(pool: &SqlitePool, id: i64) -> Result<Option<Expor
             state as "state: ExportState",
             step as "step: ExportStep",
             progress,
-            created_at as "created_at: NaiveDateTime"
+            created_at as "created_at: OffsetDateTime"
         FROM Export WHERE Export.id = ?"#,
         id
     )

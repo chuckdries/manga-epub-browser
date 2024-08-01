@@ -5,7 +5,7 @@ use axum::Extension;
 use sqlx::SqlitePool;
 
 use crate::{
-    services::export::{get_export_list, Export},
+    models::export::{get_export_list, Export},
     AppError,
 };
 

@@ -13,12 +13,8 @@ use serde::Deserialize;
 use sqlx::SqlitePool;
 
 use crate::{
-    services::{
-        book_compiler::begin_compile_book,
-        export::{
-            get_export_and_chapters_by_id, set_export_config, Export, ExportFormat, ExportState,
-        },
-    },
+    services::book_compiler::begin_compile_book,
+    models::export::{Export, ExportFormat, ExportState, get_export_and_chapters_by_id, set_export_config},
     suwayomi::{self, chapters_by_ids::ChaptersByIdsChaptersNodes},
     AppError,
 };
@@ -39,8 +35,6 @@ pub async fn view_configure_book(
         Some(export_and_chapters) => Ok(export_and_chapters),
         None => Err(AppError(eyre!("Export not found"))),
     }?;
-
-    dbg!(&chapters);
 
     if export.state != ExportState::Draft {
         return Err(AppError(eyre!("Export is not in draft state")));

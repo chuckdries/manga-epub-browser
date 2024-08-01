@@ -28,6 +28,7 @@ use local_ip_address::local_ip;
 
 mod ebook;
 mod services;
+mod models;
 mod suwayomi;
 mod util; // Declare the util module
 mod views;
@@ -44,8 +45,6 @@ extern crate log;
 // Make our own error that wraps `anyhow::Error`.
 #[derive(Debug)]
 struct AppError(eyre::Report);
-
-type AppResponse = Result<Html<String>, AppError>;
 
 #[derive(Template)]
 #[template(path = "error.html")]

@@ -4,11 +4,12 @@ use anyhow::Result;
 use askama::Template;
 use axum::{extract::Query, response::Redirect, Extension};
 use axum_extra::extract::Form;
+use eyre::eyre;
 use serde::Deserialize;
 use sqlx::SqlitePool;
 
 use crate::{
-    services::export::{create_export, set_chapters_for_export},
+    models::export::{create_export, set_chapters_for_export},
     suwayomi::{self, specific_manga_chapters::SpecificMangaChaptersMangaChaptersNodes},
     AppError,
 };
@@ -61,6 +62,10 @@ pub async fn post_chapter_select(
     Extension(pool): Extension<Arc<SqlitePool>>,
     Form(params): Form<ChapterSelectSubmission>,
 ) -> Result<Redirect, AppError> {
+    if params.chapter_id.is_empty() {
+        // TODO better error handling
+        return Err(eyre!("No chapters selected").into());
+    }
     let manga = suwayomi::get_manga_by_id(params.manga_id).await?;
     let author = manga.author.unwrap_or("Unknown".to_string());
 

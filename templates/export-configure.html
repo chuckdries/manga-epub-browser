@@ -38,9 +38,9 @@
       <label class="label">Format</label>
       <div class="select">
         <select name="format">
-          <option value="Epub" {%if export.format==crate::services::export::ExportFormat::Epub %}selected{% endif %}>
+          <option value="Epub" {%if export.format==crate::models::export::ExportFormat::Epub %}selected{% endif %}>
             EPUB</option>
-          <option value="Cbz" {%if export.format==crate::services::export::ExportFormat::Cbz %}selected{% endif %}>CBZ
+          <option value="Cbz" {%if export.format==crate::models::export::ExportFormat::Cbz %}selected{% endif %}>CBZ
           </option>
         </select>
       </div>

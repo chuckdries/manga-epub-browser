@@ -23,7 +23,7 @@
             <td>{{ export.author }}</td>
             <td>{{ export.step }}</td>
             <td>
-                {% if export.state != crate::services::export::ExportState::Draft %}
+                {% if export.state != crate::models::export::ExportState::Draft %}
                 <a class="button is-small" href="/export/{{export.id}}">View</a>
                 {% else %}
                 <a class="button is-small is-link" href="/export/{{export.id}}/configure">

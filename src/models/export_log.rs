@@ -5,7 +5,7 @@ use time::{format_description::well_known::Rfc3339, OffsetDateTime};
 
 use crate::AppError;
 
-use super::export::ExportStep;
+use crate::models::export::ExportStep;
 
 #[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
 pub struct ExportLog {
