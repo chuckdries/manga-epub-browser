@@ -10,7 +10,7 @@ use dotenv::dotenv;
 use models::export::get_export_base_dir;
 use services::exporter::resume_interrupted_exports;
 use sqlx::{migrate::MigrateDatabase, sqlite::SqliteConnectOptions, SqlitePool};
-use std::env;
+use std::{env, fs, path::Path};
 use std::{fmt::Debug, str::FromStr, sync::Arc};
 use tower_http::services::ServeDir;
 use tower_sessions::{cookie::time::Duration, Expiry, MemoryStore, SessionManagerLayer};
@@ -97,6 +97,8 @@ async fn main() {
             .expect("Invalid DATABASE_URL")
             .create_if_missing(true);
 
+    let db_base_path = Path::new(connection_settings.get_filename()).parent().unwrap();
+    fs::create_dir_all(db_base_path).unwrap();
     let pool = SqlitePool::connect_with(connection_settings)
         .await
         .expect("Failed to create pool.");
