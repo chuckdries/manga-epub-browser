@@ -3,7 +3,7 @@ use std::{
     env,
     fs::{self, File},
     io::Cursor,
-    path::{Path, PathBuf},
+    path::Path,
     sync::Arc,
 };
 
@@ -12,7 +12,10 @@ use eyre::eyre;
 use sqlx::SqlitePool;
 
 use crate::{
-    models::{export::{get_export_base_dir, Export}, export_log::log_export_step},
+    models::{
+        export::{get_export_base_dir, Export},
+        export_log::log_export_step,
+    },
     suwayomi::get_chapters_by_ids,
     AppError,
 };

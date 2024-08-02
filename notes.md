@@ -4,6 +4,7 @@ TODO
 - [ ] tracing
     - [ ] display data in detail page?
 - [ ] better error handling (correct codes, better types?)
+- [ ] spawn assembler tasks in blocking threads/radon threads?
 - [-] resume interrupted download/compilation
     - [x] skip downloading whole chapters that are already dl'd
     - [-] job system?

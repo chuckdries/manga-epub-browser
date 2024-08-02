@@ -1,7 +1,6 @@
 use chrono::{DateTime, Local};
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
-use time::{format_description::well_known::Rfc3339, OffsetDateTime};
 
 use crate::AppError;
 

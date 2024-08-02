@@ -29,7 +29,7 @@ struct CbzChapter {
 
 // TODO log events and errors
 pub async fn assemble_cbz(
-    pool: Arc<SqlitePool>,
+    _pool: Arc<SqlitePool>,
     export: &Export,
     chapter_ids: &HashSet<i64>,
 ) -> Result<(), AppError> {

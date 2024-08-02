@@ -1,8 +1,4 @@
-use axum::{
-    routing::{get, post},
-    Router,
-};
-use tower_http::services::ServeFile;
+use axum::{routing::get, Router};
 
 pub mod configure;
 mod details;

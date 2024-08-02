@@ -1,5 +1,4 @@
 extern crate dotenv;
-use anyhow::Result;
 use askama::Template;
 use axum::{
     http::StatusCode,
@@ -7,34 +6,26 @@ use axum::{
     routing::get,
     Extension, Router,
 };
-use serde::{Deserialize, Serialize};
-use services::{book_compiler::resume_interrupted_tasks, exporter::resume_interrupted_exports};
+use services::exporter::resume_interrupted_exports;
 use sqlx::SqlitePool;
 use std::{
-    collections::{HashMap, HashSet},
     fmt::Debug,
     sync::Arc,
 };
-// use suwayomi::download_chapters;
-// use suwayomi::get_chapters_by_id;
 use dotenv::dotenv;
 use std::env;
-use suwayomi::{get_all_sources_by_lang, get_library};
-// use tokio::sync::RwLock;
 use tower_http::services::ServeDir;
 use tower_sessions::{cookie::time::Duration, Expiry, MemoryStore, SessionManagerLayer};
 
 use local_ip_address::local_ip;
 
-mod ebook;
-mod services;
 mod models;
+mod services;
 mod suwayomi;
-mod util; // Declare the util module
+mod util;
 mod views;
 
 extern crate pretty_env_logger;
-// #[macro_use]
 extern crate log;
 
 // struct AppState {
@@ -95,33 +86,6 @@ async fn not_found() -> impl IntoResponse {
     Html("<h1>404 Not found</h1><a href=\"/\">Back home</a>")
 }
 
-const SESSION_OFFSET_KEY: &str = "offset";
-#[derive(Default, Deserialize, Serialize)]
-struct SessionOffset(usize);
-const SESSION_SELECTED_CHAPTERS_KEY: &str = "selected_chapters";
-#[derive(Default, Deserialize, Serialize)]
-struct SessionSelectedChapters(HashMap<usize, HashSet<i64>>);
-
-#[derive(Template)]
-#[template(path = "home.html")]
-struct HomeTemplate {
-    sources: Vec<suwayomi::all_sources_by_language::AllSourcesByLanguageSourcesNodes>,
-    library: Vec<suwayomi::get_library::GetLibraryMangasNodes>,
-    // books: Vec<SqlBook>,
-}
-// Extension(pool): Extension<Arc<SqlitePool>>
-async fn home() -> Result<HomeTemplate, AppError> {
-    let sources = get_all_sources_by_lang(suwayomi::all_sources_by_language::Variables {
-        lang: "en".to_string(),
-    })
-    .await
-    .expect("configure sources and language before using search");
-
-    let library = get_library().await?;
-    // let books = get_book_table(&pool).await?;
-    Ok(HomeTemplate { sources, library })
-}
-
 #[tokio::main]
 async fn main() {
     dotenv().ok();
@@ -143,7 +107,9 @@ async fn main() {
     let pool_clone = Arc::new(pool);
 
     // resume_interrupted_tasks(pool_clone.clone()).await.unwrap();
-    resume_interrupted_exports(pool_clone.clone()).await.unwrap();
+    resume_interrupted_exports(pool_clone.clone())
+        .await
+        .unwrap();
 
     let session_store = MemoryStore::default();
     let session_layer = SessionManagerLayer::new(session_store)
