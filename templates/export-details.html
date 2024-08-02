@@ -5,7 +5,7 @@
     <div class="is-flex is-gap-2 mb-2 is-align-items-center is-justify-content-space-between">
         <h1 class="title mb-1">{{ export.title }}</h1>
         <div>
-            <a href="/exports" class="button">Back</a>
+            <a href="/exports" class="button">Back to list</a>
             {% if export.state == crate::models::export::ExportState::Completed %}
             <a download="{{ export.get_filename() }}" href="/download/{{export.get_filename()}}"
                 class="button is-success">Download</a>

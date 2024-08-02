@@ -6,15 +6,12 @@ use axum::{
     routing::get,
     Extension, Router,
 };
+use dotenv::dotenv;
 use models::export::get_export_base_dir;
 use services::exporter::resume_interrupted_exports;
-use sqlx::SqlitePool;
-use std::{
-    fmt::Debug,
-    sync::Arc,
-};
-use dotenv::dotenv;
+use sqlx::{migrate::MigrateDatabase, sqlite::SqliteConnectOptions, SqlitePool};
 use std::env;
+use std::{fmt::Debug, str::FromStr, sync::Arc};
 use tower_http::services::ServeDir;
 use tower_sessions::{cookie::time::Duration, Expiry, MemoryStore, SessionManagerLayer};
 
@@ -26,8 +23,8 @@ mod suwayomi;
 mod util;
 mod views;
 
-extern crate pretty_env_logger;
 extern crate log;
+extern crate pretty_env_logger;
 
 // struct AppState {
 //     config: RwLock<AppConfig>, // Use RwLock for thread-safe access
@@ -92,11 +89,17 @@ async fn main() {
     dotenv().ok();
     pretty_env_logger::init();
 
-    // Create a connection pool
-    let pool =
-        SqlitePool::connect(&env::var("DATABASE_URL").expect("DATABASE_URL is a required field"))
-            .await
-            .expect("Failed to create pool.");
+    let db_url = env::var("DATABASE_URL").expect("DATABASE_URL in .env is required");
+    dbg!(&db_url);
+
+    let connection_settings =
+        SqliteConnectOptions::from_str(&db_url)
+            .expect("Invalid DATABASE_URL")
+            .create_if_missing(true);
+
+    let pool = SqlitePool::connect_with(connection_settings)
+        .await
+        .expect("Failed to create pool.");
 
     println!("running migrations");
 
