@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        UPDATE Export\n        SET title = ?, author = ?, format = ?\n        WHERE id = ?\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "bb53dd53c94261e9fef27db84c04e41c8268cd978c94ec004421f58f29e5e421"
+}

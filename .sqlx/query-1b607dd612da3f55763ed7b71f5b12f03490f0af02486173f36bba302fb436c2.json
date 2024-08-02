@@ -1,0 +1,62 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        SELECT \n            id,\n            title,\n            author,\n            format as \"format: ExportFormat\",\n            state as \"state: ExportState\",\n            step as \"step: ExportStep\",\n            progress,\n            created_at as \"created_at: OffsetDateTime\"\n        FROM Export\n        ORDER BY id ASC\n        ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Int64"
+      },
+      {
+        "name": "title",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "author",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "format: ExportFormat",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "state: ExportState",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "step: ExportStep",
+        "ordinal": 5,
+        "type_info": "Text"
+      },
+      {
+        "name": "progress",
+        "ordinal": 6,
+        "type_info": "Int64"
+      },
+      {
+        "name": "created_at: OffsetDateTime",
+        "ordinal": 7,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "1b607dd612da3f55763ed7b71f5b12f03490f0af02486173f36bba302fb436c2"
+}

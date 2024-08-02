@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        SELECT chapter_id\n        FROM ExportChapters\n        WHERE export_id = ?\n        ",
+  "describe": {
+    "columns": [
+      {
+        "name": "chapter_id",
+        "ordinal": 0,
+        "type_info": "Int64"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "73bfa02488c66016bfad8d3f6869746777cde181603e6ed817c60cd732e8b174"
+}

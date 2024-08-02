@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO ExportLogs (export_id, step, message, timestamp) VALUES (?, ?, ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "efd64206b1a626d79916bd06dab1379f180bbb7cb6239e0dbedf94313664bb8e"
+}

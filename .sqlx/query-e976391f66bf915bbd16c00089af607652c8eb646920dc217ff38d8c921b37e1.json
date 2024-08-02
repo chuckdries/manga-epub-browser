@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        DELETE FROM ExportChapters\n        WHERE export_id = ?\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "e976391f66bf915bbd16c00089af607652c8eb646920dc217ff38d8c921b37e1"
+}

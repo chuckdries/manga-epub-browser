@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            INSERT INTO ExportChapters (export_id, chapter_id)\n            VALUES (?, ?)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "31eb02b41c2188d029783d34c30e6ec1ef107899c43ae348d2dbd8298c44c3da"
+}
