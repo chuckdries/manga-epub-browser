@@ -11,12 +11,13 @@
       </p>
     </div>
     <div>
+      <a href="/export/new/select-manga" class="button">Back</a>
       {% if hide_read %}
       <a class="button" href="/export/new/select-chapters?manga_id={{ manga_id }}&hide_read=false">Show read</a>
       {% else %}
       <a class="button" href="/export/new/select-chapters?manga_id={{ manga_id }}&hide_read=true">Hide read</a>
       {% endif %}
-      <button class="button is-link" type="submit">Next</button>
+      <button disabled class="button is-link" type="submit">Next</button>
     </div>
   </div>
   <table class="table is-fullwidth">
@@ -30,7 +31,7 @@
     <tbody>
       {% for chapter in chapters %}
       <tr id="chapter-{{chapter.chapter_number}}"
-        _="on mousedown or mouseenter [buttons==1] toggle @checked on <input/> in me">
+        _="on mousedown or mouseenter [buttons==1] toggle @checked on <input/> in me then remove @disabled from <button[type=submit]/>">
         <td>
           <div class="fake-check"></div>
           <input style="visibility: hidden" type="checkbox" name="chapter_id" value="{{ chapter.id }}"

@@ -14,7 +14,7 @@
                 <th>Author</th>
                 <th>Format</th>
                 <th>Status</th>
-                <th></th>
+                <th class="is-narrow "></th>
             </tr>
         </thead>
         {% for export in exports %}
@@ -24,9 +24,11 @@
             <td>{{ export.author }}</td>
             <td>{{ export.format }}</td>
             <td>{{ export.state }}</td>
-            <td>
+            <td class="is-flex is-gap-1 is-justify-content-end">
                 {% if export.state != crate::models::export::ExportState::Draft %}
                 <a class="button is-small" href="/export/{{export.id}}">View</a>
+                <a class="button is-small is-success" download="{{ export.get_filename() }}"
+                    href="/export/{{export.id}}/download">Download</a>
                 {% else %}
                 <a class="button is-small is-link" href="/export/{{export.id}}/configure">
                     Configure

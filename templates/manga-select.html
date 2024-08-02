@@ -3,15 +3,15 @@
 {% endblock %} {% block content %}
 
 <form class="section" action="/export/new/select-chapters" method="get">
-  <div
-    class="is-flex is-justify-content-space-between is-align-items-center"
-  >
+  <div class="is-flex is-justify-content-space-between is-align-items-center">
     <div>
       <h1 class="title is-4">1. Select source title</h1>
       <p class="subtitle">Visit Suwayomi to add more titles to your library</p>
     </div>
     <div>
-      <button class="button is-link" type="submit">Next</button>
+      <a href="/exports" class="button">Cancel</a>
+      <button _="init if <input[type=radio][selected]/> exists remove @disabled from me" disabled class="button is-link"
+        type="submit">Next</button>
     </div>
   </div>
   <table class="table is-fullwidth">
@@ -26,19 +26,12 @@
       {% for manga in mangas %}
       <tr>
         <td>
-          <input
-            id="manga-{{ manga.id }}"
-            type="radio"
-            name="manga_id"
-            value="{{ manga.id }}"
-          />
+          <input _="on change remove @disabled from <button[type=submit]/>" id="manga-{{ manga.id }}" type="radio"
+            name="manga_id" value="{{ manga.id }}" />
         </td>
         <td><label for="manga-{{ manga.id }}">{{ manga.title }}</label></td>
         <td>
-          {% if let Some(author) = manga.author %}<label
-            for="manga-{{ manga.id }}"
-            >{{ author }}</label
-          >{% endif %}
+          {% if let Some(author) = manga.author %}<label for="manga-{{ manga.id }}">{{ author }}</label>{% endif %}
         </td>
       </tr>
       {% endfor %}
