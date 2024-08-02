@@ -9,6 +9,7 @@ TODO
     - [-] job system?
 - [ ] export file name collision handling?
 - [-] export download
+- [ ] better download urls
 - [x] export to cbz
 - [ ] display download progress
 - [ ] display export job progress

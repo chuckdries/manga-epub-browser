@@ -330,7 +330,7 @@ pub async fn get_export_list(pool: &SqlitePool) -> Result<Vec<Export>, AppError>
             progress,
             created_at as "created_at: OffsetDateTime"
         FROM Export
-        ORDER BY created_at DESC
+        ORDER BY id ASC
         "#
     )
     .fetch_all(pool)
