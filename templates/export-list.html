@@ -27,12 +27,14 @@
             <td class="is-flex is-gap-1 is-justify-content-end">
                 {% if export.state != crate::models::export::ExportState::Draft %}
                 <a class="button is-small" href="/export/{{export.id}}">View</a>
-                <a class="button is-small is-success" download="{{ export.get_filename() }}"
-                    href="/export/{{export.id}}/download">Download</a>
                 {% else %}
                 <a class="button is-small is-link" href="/export/{{export.id}}/configure">
                     Configure and export
                 </a>
+                {% endif %}
+                {% if export.state == crate::models::export::ExportState::Completed %}
+                <a class="button is-small is-success" download="{{ export.get_filename() }}"
+                    href="/download/{{export.get_filename()}}">Download</a>
                 {% endif %}
             </td>
         </tr>

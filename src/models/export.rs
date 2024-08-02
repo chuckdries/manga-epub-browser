@@ -96,14 +96,11 @@ pub fn get_export_base_dir() -> String {
 impl Export {
     pub fn get_filename(&self) -> String {
         let extension = self.format.to_extension();
-        dbg!(&extension);
         format!("{}.{}", self.title, extension)
     }
     pub fn get_path(&self) -> PathBuf {
         let base_dir = get_export_base_dir();
-        dbg!(&base_dir);
         let filename = self.get_filename();
-        dbg!(&filename);
         Path::new(&base_dir).join(filename)
     }
 }
@@ -143,7 +140,7 @@ pub async fn insert_export(
         "#,
         title,
         author,
-        ExportFormat::Epub,
+        ExportFormat::Cbz,
         ExportState::Draft,
         ExportStep::Begin,
         0,

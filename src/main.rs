@@ -6,6 +6,7 @@ use axum::{
     routing::get,
     Extension, Router,
 };
+use models::export::get_export_base_dir;
 use services::exporter::resume_interrupted_exports;
 use sqlx::SqlitePool;
 use std::{
@@ -122,6 +123,7 @@ async fn main() {
         .nest("/export", views::export::get_routes())
         .nest("/exports", views::exports::get_routes())
         .nest_service("/public", ServeDir::new("public"))
+        .nest_service("/download", ServeDir::new(get_export_base_dir()))
         .fallback(not_found)
         .layer(Extension(pool_clone.clone()))
         .layer(session_layer);

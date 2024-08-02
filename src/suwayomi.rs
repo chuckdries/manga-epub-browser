@@ -212,8 +212,6 @@ pub async fn download_chapters_from_source(
     )
     .await?;
 
-    dbg!(res);
-
     loop {
         let downloader_state = match post_graphql::<CheckOnDownloadProgress, _>(
             &client,
@@ -226,9 +224,8 @@ pub async fn download_chapters_from_source(
             Some(data) => data,
             None => break,
         };
-
-        dbg!(&downloader_state);
-
+        dbg!(&downloader_state.download_status.queue.first());
+        dbg!(&downloader_state.download_status.queue.len());
         if downloader_state.download_status.state == DownloaderState::STOPPED {
             break;
         }
