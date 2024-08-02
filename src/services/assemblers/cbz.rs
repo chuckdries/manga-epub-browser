@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
 use zip::{write::SimpleFileOptions, CompressionMethod, ZipWriter};
 
-use crate::{models::export::Export, suwayomi::get_chapters_by_ids, AppError};
+use crate::{models::export::{get_export_base_dir, Export}, suwayomi::get_chapters_by_ids, AppError};
 
 #[derive(Serialize, Deserialize)]
 struct CbzMetadata {
@@ -34,7 +34,11 @@ pub async fn assemble_cbz(
     chapter_ids: &HashSet<i64>,
 ) -> Result<(), AppError> {
     let chapter_base_dir = &env::var("CHAPTER_DL_PATH").unwrap_or("data/chapters".to_string());
+    let export_base_dir = &get_export_base_dir();
+    std::fs::create_dir_all(&export_base_dir)?;
+
     let output_path = export.get_path();
+
     let file = File::create(&output_path)?;
     let mut zip = ZipWriter::new(file);
 
@@ -84,8 +88,6 @@ fn add_directory_to_zip<T: Write + Seek>(
     dir_path: &Path,
     zip_path: &str,
 ) -> io::Result<()> {
-    dbg!(&dir_path);
-    dbg!(&zip_path);
     for entry in fs::read_dir(dir_path)? {
         dbg!(&entry);
         let entry = entry?;

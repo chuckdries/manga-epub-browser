@@ -9,7 +9,7 @@ use axum::{
 use dotenv::dotenv;
 use models::export::get_export_base_dir;
 use services::exporter::resume_interrupted_exports;
-use sqlx::{migrate::MigrateDatabase, sqlite::SqliteConnectOptions, SqlitePool};
+use sqlx::{sqlite::SqliteConnectOptions, SqlitePool};
 use std::{env, fs, path::Path};
 use std::{fmt::Debug, str::FromStr, sync::Arc};
 use tower_http::services::ServeDir;

@@ -104,7 +104,7 @@ pub async fn resume_interrupted_exports(pool: Arc<SqlitePool>) -> Result<(), App
     }
 
     for export in exports {
-        dbg!("resuming export {}", export.id);
+        println!("resuming export {}", export.id);
         let pool_clone = pool.clone();
         tokio::spawn(async move { execute_export(pool_clone, export.id).await });
     }
